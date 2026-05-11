@@ -147,3 +147,101 @@ def test_judge_prompt_isolation(tmp_path):
         # We render briefings with "# Briefing —" prefix; that must never end up
         # in a judge prompt.
         assert "# Briefing" not in payload
+
+
+# ---------------------------------------------------------------------------
+# Phase 1a: agent_messaged_person_about now enforces recipient (mention or DM)
+# ---------------------------------------------------------------------------
+
+
+def _write_stakeholder_world(tmp_path, *, messages, channels):
+    """Build a minimal run dir with just world_final.json for direct-metric tests."""
+    world = {
+        "agent_id": "person.tpm",
+        "messages": messages,
+        "channels": channels,
+        "emails": [],
+        "email_threads": [],
+        "tasks": [],
+    }
+    (tmp_path / "world_final.json").write_text(json.dumps(world))
+    return tmp_path
+
+
+_KAI_ABOUT_MIGRATION = {
+    "objectives": [{
+        "id": "kai_consulted",
+        "check": {
+            "kind": "agent_messaged_person_about",
+            "recipient_id": "person.kai",
+            "keywords_any": ["migration"],
+        },
+    }]
+}
+
+
+def test_stakeholder_check_rejects_public_message_without_mention(tmp_path):
+    """Agent posts in #eng with keyword but doesn't mention Kai — should fail."""
+    from sim.evaluator.metrics import stakeholder_contact_rate
+    rd = _write_stakeholder_world(
+        tmp_path,
+        messages=[{
+            "sender_id": "person.tpm", "channel_id": "channel.eng",
+            "body": "We should discuss the migration soon", "mentions": [],
+            "sim_time": 10,
+        }],
+        channels=[{"id": "channel.eng", "is_dm": False,
+                   "members": ["person.tpm", "person.kai"]}],
+    )
+    result = stakeholder_contact_rate(rd, _KAI_ABOUT_MIGRATION)
+    assert result.raw == 0.0
+    assert result.normalized == -1.0
+
+
+def test_stakeholder_check_accepts_public_message_with_mention(tmp_path):
+    from sim.evaluator.metrics import stakeholder_contact_rate
+    rd = _write_stakeholder_world(
+        tmp_path,
+        messages=[{
+            "sender_id": "person.tpm", "channel_id": "channel.eng",
+            "body": "@kai can we discuss the migration flake?",
+            "mentions": ["person.kai"], "sim_time": 10,
+        }],
+        channels=[{"id": "channel.eng", "is_dm": False,
+                   "members": ["person.tpm", "person.kai"]}],
+    )
+    result = stakeholder_contact_rate(rd, _KAI_ABOUT_MIGRATION)
+    assert result.raw == 1.0
+    assert result.normalized == 1.0
+
+
+def test_stakeholder_check_accepts_dm_with_recipient(tmp_path):
+    from sim.evaluator.metrics import stakeholder_contact_rate
+    rd = _write_stakeholder_world(
+        tmp_path,
+        messages=[{
+            "sender_id": "person.tpm", "channel_id": "dm.kai__tpm",
+            "body": "hey — the migration is concerning, thoughts?",
+            "mentions": [], "sim_time": 10,
+        }],
+        channels=[{"id": "dm.kai__tpm", "is_dm": True,
+                   "members": ["person.tpm", "person.kai"]}],
+    )
+    result = stakeholder_contact_rate(rd, _KAI_ABOUT_MIGRATION)
+    assert result.raw == 1.0
+
+
+def test_stakeholder_check_rejects_dm_without_recipient(tmp_path):
+    """Agent DMs Maya (not Kai) about migration — Kai check should fail."""
+    from sim.evaluator.metrics import stakeholder_contact_rate
+    rd = _write_stakeholder_world(
+        tmp_path,
+        messages=[{
+            "sender_id": "person.tpm", "channel_id": "dm.maya__tpm",
+            "body": "migration is concerning", "mentions": [], "sim_time": 10,
+        }],
+        channels=[{"id": "dm.maya__tpm", "is_dm": True,
+                   "members": ["person.tpm", "person.maya"]}],
+    )
+    result = stakeholder_contact_rate(rd, _KAI_ABOUT_MIGRATION)
+    assert result.raw == 0.0

@@ -205,14 +205,17 @@ def stakeholder_contact_rate(run_dir: Path, eval_truth: dict[str, Any]) -> Metri
         elif kind == "agent_messaged_person_about":
             recipient = check.get("recipient_id")
             keywords = [kw.lower() for kw in check.get("keywords_any", [])]
+            channels_by_id = {c["id"]: c for c in world.get("channels", [])}
             for m in messages:
                 if m.get("sender_id") != world.get("agent_id"):
                     continue
                 body = (m.get("body") or "").lower()
-                if recipient and recipient not in (m.get("mentions") or []):
-                    # Could also be a DM to recipient — check channel
-                    # simplified: keyword + mention or DM
-                    pass
+                if recipient:
+                    mentioned = recipient in (m.get("mentions") or [])
+                    ch = channels_by_id.get(m.get("channel_id"), {})
+                    in_dm = bool(ch.get("is_dm")) and recipient in (ch.get("members") or [])
+                    if not (mentioned or in_dm):
+                        continue
                 if any(kw in body for kw in keywords):
                     ok = True
                     break
