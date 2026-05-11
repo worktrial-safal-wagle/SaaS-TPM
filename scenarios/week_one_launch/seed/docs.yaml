@@ -1,0 +1,117 @@
+docs:
+  - id: doc.runbook_v24
+    title: "v2.4 deploy runbook"
+    created_by: person.kai
+    sim_time: 0
+    body: |
+      # v2.4 Deploy Runbook (v3)
+
+      ## Pre-deploy
+      - All smoke tests green on staging.
+      - Migration dry-run passes on the prod-shadow workspace.
+      - Customer comms email sent ≥ 24h before deploy window.
+
+      ## Deploy window
+      - Friday 13:00–17:00 PT.
+      - Primary on-call: Kai. Secondary: Maya. Comms: Jordan.
+
+      ## Rollback
+      - Rollback window: 2 hours after deploy.
+      - Procedure: revert release tag, restore DB from snapshot S-v24-pre.
+      - DRI for rollback decision: VP Eng (Dani).
+
+  - id: doc.audit_prd
+    title: "Audit-log feature — PRD"
+    created_by: person.sam
+    sim_time: 0
+    body: |
+      # Audit-log PRD
+
+      ## Goal
+      Give customer admins a queryable log of state changes affecting their workspace.
+
+      ## Surface
+      - Web UI: filterable table.
+      - **Dates rendered in the user's locale, including in the API response.**
+      - Export to CSV.
+
+      ## Retention
+      - Default 365 days.
+
+      ## Out of scope
+      - Per-event diffing (planned for v2.5).
+
+  - id: doc.audit_eng_spec
+    title: "Audit-log feature — Engineering spec"
+    created_by: person.priya
+    sim_time: 0
+    body: |
+      # Audit-log Engineering Spec
+
+      ## API
+      - Endpoint: `GET /v1/audit-log`
+      - **All timestamps returned in ISO-8601 UTC.** Frontend handles localisation.
+      - Pagination via cursor.
+
+      ## Storage
+      - Append-only table; partitioned weekly.
+      - Retention: 365 days (under legal review).
+
+      ## Open question
+      - Date format must be reconciled with the PRD before integration tests
+        can be authored.
+
+  - id: doc.pipeline_rfc
+    title: "Data pipeline refactor — RFC"
+    created_by: person.kai
+    sim_time: 0
+    body: |
+      # Data pipeline refactor RFC
+
+      ## Motivation
+      Current pipeline is event-batch only; we need streaming for the new
+      audit-log feature and for the partner integrations Morgan is closing.
+
+      ## Proposal
+      Refactor to a Kafka-based ingest with a Postgres sink. Two-quarter
+      project; Q2 is the earliest possible start.
+
+      ## Decision needed
+      - Greenlight Q2 start, or defer to Q3?
+
+      ## Recommendation
+      Defer to Q3. Q2 capacity should go to audit-log and v2.4 stabilisation.
+
+  - id: doc.onboarding_tpm
+    title: "TPM onboarding — first week"
+    created_by: person.dani
+    sim_time: 0
+    body: |
+      # TPM onboarding
+
+      ## First-week priorities
+      1. Land v2.4 with no customer-visible regressions.
+      2. Resolve open audit-log decisions (PRD vs eng spec).
+      3. Decide pipeline RFC by EOW.
+
+      ## People to meet
+      - Kai (Sr Backend, owns v2.4)
+      - Priya (Eng Lead, owns audit-log)
+      - Sam (Designer, audit-log)
+      - Jordan (Support Lead)
+      - Maya (Junior backend; her status updates are precise — listen)
+      - Morgan (Sales; cares about audit-log shipping)
+
+      ## Norms
+      - Standups async-first in #engineering.
+      - Daily 1:1 with Dani at 16:30.
+
+  - id: doc.q1_retro
+    title: "Q1 retrospective notes (FYI)"
+    created_by: person.dani
+    sim_time: 0
+    body: |
+      # Q1 retro — top three takeaways
+      1. Migrations are our biggest deploy risk. Always do a load dry-run.
+      2. Customer comms run late three releases out of four.
+      3. We over-commit on dates without consulting eng. Stop doing this.
