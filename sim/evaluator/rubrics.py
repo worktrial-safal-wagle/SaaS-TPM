@@ -27,16 +27,20 @@ rubric. You see ONLY the artifact body, the rubric items, and a short
 ground-truth context block. You do NOT see the agent's transcript or
 self-narration.
 
-Return a single JSON object:
+Output JSON ONLY. The first character of your response must be `{`. Do
+not add prose, markdown fences, or commentary. Return exactly this shape,
+with ONE entry per rubric item, in the same order they were given:
 
 {
   "items": [
-    {"index": 0, "pass": true/false, "rationale": "<one short sentence>"},
-    ...
+    {"index": 0, "pass": true, "rationale": "<one short sentence>"},
+    {"index": 1, "pass": false, "rationale": "<one short sentence>"}
   ]
 }
 
-Be strict. If the artifact does not explicitly address an item, mark it false.
+Be strict: if the artifact does not explicitly address an item, mark it
+false. Do not skip items — the "items" array length must equal the number
+of rubric items in the user payload.
 """
 
 

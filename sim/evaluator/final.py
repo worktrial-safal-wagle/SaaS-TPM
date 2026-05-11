@@ -45,33 +45,44 @@ from sim.evaluator.rubrics import ArtifactScore, score_artifact
 
 JUDGE_AXES_SYSTEM_PROMPT = """\
 You are scoring a Technical Program Manager's whole-week behavior on three
-axes. For each axis, return a score in [-1, +1] and a single-sentence
-rationale. Output JSON only:
+axes. The user payload is a redacted JSON object containing what the agent
+SAW (inbound chats and emails — DMs to the agent, mentions of the agent,
+and emails to/cc the agent) and what the agent DID (outbound chats,
+outbound emails, tool-call counts, final task board). You do NOT see the
+agent's internal briefing, reasoning, or self-narration.
+
+Output JSON ONLY. The first character of your response must be `{`. Do
+not add prose, markdown fences, or commentary. Return exactly this shape
+with ALL THREE axis keys present. If you cannot score an axis confidently,
+return score 0.0 and explain in the rationale:
 
 {
-  "specificity":      {"score": <float>, "rationale": "<one sentence>"},
-  "decision_hygiene": {"score": <float>, "rationale": "<one sentence>"},
-  "risk_escalation":  {"score": <float>, "rationale": "<one sentence>"}
+  "specificity":      {"score": <float in [-1, 1]>, "rationale": "<one short sentence>"},
+  "decision_hygiene": {"score": <float in [-1, 1]>, "rationale": "<one short sentence>"},
+  "risk_escalation":  {"score": <float in [-1, 1]>, "rationale": "<one short sentence>"}
 }
 
 Axis definitions:
-- specificity: were the agent's outputs (messages, emails, doc edits)
+- specificity: were the agent's outbound messages, emails, and doc edits
   concrete and actionable rather than vague?
-- decision_hygiene: when the agent made decisions, were they grounded in
-  evidence and the relevant stakeholders consulted?
+- decision_hygiene: COMPARE inbound to outbound. Did the agent respond to
+  what was actually asked? Before committing to decisions, did they contact
+  the people who surfaced the relevant information in the inbound?
 - risk_escalation: did the agent surface risks proactively to leadership
-  rather than letting them simmer?
-
-You see only a redacted summary; never the full agent transcript.
+  (look for outbound that names risks raised in the inbound) rather than
+  letting them simmer?
 """
 
 JUDGE_STATE_ACCURACY_PROMPT = """\
-You are checking whether the agent's outbound claims (messages, emails) about
-the state of the world match the actual final world state. Return a single
-JSON object with one axis:
+You are checking whether the agent's outbound claims (messages, emails)
+about the state of the world match the actual final world state shown
+in the payload.
+
+Output JSON ONLY. The first character of your response must be `{`. Do
+not add prose, markdown fences, or commentary. Return exactly this shape:
 
 {
-  "state_accuracy": {"score": <float in [-1,1]>, "rationale": "<one sentence>"}
+  "state_accuracy": {"score": <float in [-1, 1]>, "rationale": "<one short sentence>"}
 }
 """
 
@@ -285,12 +296,16 @@ def grade_and_write(run_dir: str | Path, *, judge: Judge | None = None) -> Final
 def _build_axes_payload(world: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     """Build a redacted payload for the judge axes.
 
-    The payload includes:
+    The payload includes BOTH sides of the agent's surface:
       - tool call summary counts
-      - the agent's outbound messages and emails (truncated)
-      - the final task board status
-    It does NOT include the agent's full transcript prose or any of the
-    agent's own claims about how it did.
+      - INBOUND chats the agent could see (DMs to the agent, mentions of
+        the agent in channels) and INBOUND emails (to/cc the agent)
+      - OUTBOUND chats and emails the agent sent
+      - final task board status
+
+    It does NOT include the agent's briefing, reasoning prose, or any
+    self-narration — that's the Phase 1d redaction invariant. Inbound is
+    safe to expose: the agent itself had visibility on it.
     """
     agent_id = world.get("agent_id")
     turns = []
@@ -303,11 +318,35 @@ def _build_axes_payload(world: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     for t in turns:
         tool_counts[t["tool"]] = tool_counts.get(t["tool"], 0) + 1
 
+    channels_by_id = {c["id"]: c for c in world.get("channels", [])}
+
+    def _is_inbound_chat(m: dict[str, Any]) -> bool:
+        if m.get("sender_id") == agent_id:
+            return False
+        if agent_id in (m.get("mentions") or []):
+            return True
+        ch = channels_by_id.get(m.get("channel_id"), {})
+        return bool(ch.get("is_dm")) and agent_id in (ch.get("members") or [])
+
+    inbound_messages = [
+        {"sim_time": m["sim_time"], "sender": m.get("sender_id"),
+         "body": (m.get("body") or "")[:200]}
+        for m in world.get("messages", [])
+        if _is_inbound_chat(m)
+    ][:30]
     outbound_messages = [
         {"sim_time": m["sim_time"], "body": (m.get("body") or "")[:300]}
         for m in world.get("messages", [])
         if m.get("sender_id") == agent_id
     ][:30]
+    inbound_emails = [
+        {"sim_time": e["sim_time"], "sender": e.get("sender_id"),
+         "body": (e.get("body") or "")[:300]}
+        for e in world.get("emails", [])
+        if e.get("sender_id") != agent_id and (
+            agent_id in (e.get("to") or []) or agent_id in (e.get("cc") or [])
+        )
+    ][:15]
     outbound_emails = [
         {"sim_time": e["sim_time"], "body": (e.get("body") or "")[:400]}
         for e in world.get("emails", [])
@@ -319,7 +358,9 @@ def _build_axes_payload(world: dict[str, Any], run_dir: Path) -> dict[str, Any]:
     ]
     return {
         "tool_counts": tool_counts,
+        "agent_inbound_chat_excerpts": inbound_messages,
         "agent_outbound_chat_excerpts": outbound_messages,
+        "agent_inbound_email_excerpts": inbound_emails,
         "agent_outbound_email_excerpts": outbound_emails,
         "task_board_final": task_status,
     }

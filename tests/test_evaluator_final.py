@@ -650,3 +650,71 @@ def test_missing_axis_in_judge_response_marked_failed(tmp_path):
     assert result.judge.axes["specificity"].failed is False
     assert result.judge.axes["decision_hygiene"].failed is False
     assert any("risk_escalation" in e for e in result.errors)
+
+
+# ---------------------------------------------------------------------------
+# Phase 2: judge axes payload includes inbound + outbound (both sides)
+# ---------------------------------------------------------------------------
+
+
+def test_axes_payload_includes_inbound_dms_and_mentions(tmp_path):
+    """Inbound chats are DMs to the agent OR channel messages mentioning the
+    agent. Outbound chats are the agent's sends. Non-addressed channel chatter
+    is excluded so the judge isn't drowned in irrelevant context."""
+    from sim.evaluator.final import _build_axes_payload
+    world = {
+        "agent_id": "person.tpm",
+        "messages": [
+            {"sender_id": "person.tpm", "channel_id": "channel.eng",
+             "body": "my outbound post", "sim_time": 100, "mentions": []},
+            {"sender_id": "person.maya", "channel_id": "dm.maya__tpm",
+             "body": "Maya DM to me about migration", "sim_time": 50,
+             "mentions": []},
+            {"sender_id": "person.kai", "channel_id": "channel.eng",
+             "body": "@tpm please review the spec", "sim_time": 60,
+             "mentions": ["person.tpm"]},
+            {"sender_id": "person.sam", "channel_id": "channel.eng",
+             "body": "general chatter not addressed to me", "sim_time": 70,
+             "mentions": []},
+        ],
+        "channels": [
+            {"id": "channel.eng", "is_dm": False,
+             "members": ["person.tpm", "person.kai", "person.sam"]},
+            {"id": "dm.maya__tpm", "is_dm": True,
+             "members": ["person.tpm", "person.maya"]},
+        ],
+        "emails": [
+            {"sender_id": "person.tpm", "to": ["person.alex"], "cc": [],
+             "body": "outbound", "sim_time": 200},
+            {"sender_id": "person.bigcorp", "to": ["person.tpm"], "cc": [],
+             "body": "URGENT escalation", "sim_time": 150},
+            {"sender_id": "person.alex", "to": ["person.dani"],
+             "cc": ["person.tpm"], "body": "agent is cc'd", "sim_time": 160},
+            {"sender_id": "person.alex", "to": ["person.dani"], "cc": [],
+             "body": "agent not on this thread", "sim_time": 170},
+        ],
+        "tasks": [],
+        "email_threads": [],
+        "docs": [],
+        "people": [],
+    }
+    (tmp_path / "world_final.json").write_text(json.dumps(world))
+    (tmp_path / "turns.jsonl").write_text("")
+    payload = _build_axes_payload(world, tmp_path)
+
+    inbound_chats = [m["body"] for m in payload["agent_inbound_chat_excerpts"]]
+    assert "Maya DM to me about migration" in inbound_chats   # DM hit
+    assert "@tpm please review the spec" in inbound_chats     # mention hit
+    assert "general chatter not addressed to me" not in inbound_chats
+    assert "my outbound post" not in inbound_chats
+
+    outbound_chats = [m["body"] for m in payload["agent_outbound_chat_excerpts"]]
+    assert "my outbound post" in outbound_chats
+
+    inbound_emails = [e["body"] for e in payload["agent_inbound_email_excerpts"]]
+    assert "URGENT escalation" in inbound_emails               # to: agent
+    assert "agent is cc'd" in inbound_emails                   # cc: agent
+    assert "agent not on this thread" not in inbound_emails
+    assert "outbound" not in inbound_emails
+
+
