@@ -29,13 +29,24 @@ from sim.store.worktime import MINUTES_PER_DAY
 WEEKDAY_LABEL = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
 
 
-class BriefingTaskDelta(BaseModel):
+class BriefingProjectBoardItem(BaseModel):
+    """An item on the TPM's ambient project board.
+
+    The board is rendered each turn as the live state of open work across
+    the team — what a real TPM has visible in their tracker tab. This
+    eliminates the need for the agent to spend turns calling `tasks.list`
+    just to recreate a view of the board.
+    """
+
     model_config = ConfigDict(extra="forbid")
     task_id: str
     title: str
     status: str
     assignee_id: str | None
     priority: str
+    deadline_sim_time: int | None = None
+    # True if any of the task's `depends_on` entries is still not Done.
+    blocked: bool = False
 
 
 class BriefingCommitment(BaseModel):
@@ -65,7 +76,10 @@ class Briefing(BaseModel):
     unread_chats: list[dict[str, Any]]  # [{channel_id, channel_name, messages: [...]}]
     unread_emails: list[dict[str, Any]]
     open_commitments: list[BriefingCommitment]
-    task_deltas: list[BriefingTaskDelta]
+    # The team's open task board: top not-Done tasks across all assignees,
+    # sorted by (priority, deadline, id). Capped to keep the briefing bounded.
+    # See the BriefingProjectBoardItem docstring for the design rationale.
+    project_board: list[BriefingProjectBoardItem]
     upcoming_calendar: list[dict[str, Any]]
     recent_actions: list[BriefingRecentAction] = Field(default_factory=list)
     # Number of consecutive recent turns that did not advance sim_time. Surfaced
@@ -112,16 +126,10 @@ class BriefingAssembler:
         # Open commitments
         commitments = self._open_commitments(agent_id, now_sim_time)
 
-        # Task deltas since last turn
-        task_deltas = [
-            BriefingTaskDelta(
-                task_id=t.id, title=t.title, status=t.status,
-                assignee_id=t.assignee_id, priority=t.priority,
-            )
-            for t in self.world.tasks.values()
-            if t.assignee_id == agent_id or self._task_recently_touched(t, last_turn_sim_time)
-        ]
-        task_deltas.sort(key=lambda d: (d.priority, d.task_id))
+        # Project board: top not-Done tasks across all assignees. The TPM's
+        # ambient view of the team's work — not filtered to "tasks I own,"
+        # since the TPM coordinates everyone else's work.
+        project_board = self._build_project_board()
 
         # Upcoming calendar (next 4 sim-hours)
         window_end = now_sim_time + 240
@@ -150,7 +158,7 @@ class BriefingAssembler:
             unread_chats=unread_chats,
             unread_emails=unread_emails,
             open_commitments=commitments,
-            task_deltas=task_deltas,
+            project_board=project_board,
             upcoming_calendar=upcoming,
             recent_actions=list(recent_actions or []),
             sim_time_stalled_for_turns=sim_time_stalled_for_turns,
@@ -240,6 +248,39 @@ class BriefingAssembler:
     def _task_recently_touched(self, task: Task, last_turn_sim_time: int) -> bool:
         return any(c.sim_time > last_turn_sim_time for c in task.comments)
 
+    # Maximum entries shown on the project board. Bounded so the briefing
+    # doesn't grow unboundedly on big scenarios — the agent is expected to
+    # use `tasks.list` only when it needs to see something the board cuts off.
+    PROJECT_BOARD_CAP = 20
+
+    _PRIORITY_RANK = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+
+    def _build_project_board(self) -> list[BriefingProjectBoardItem]:
+        tasks_by_id = self.world.tasks
+
+        def _is_blocked(task: Task) -> bool:
+            return any(
+                tasks_by_id.get(dep) is not None
+                and tasks_by_id[dep].status != "Done"
+                for dep in task.depends_on
+            )
+
+        not_done = [t for t in tasks_by_id.values() if t.status != "Done"]
+        not_done.sort(key=lambda t: (
+            self._PRIORITY_RANK.get(t.priority, 9),
+            t.deadline_sim_time if t.deadline_sim_time is not None else 10**9,
+            t.id,
+        ))
+        return [
+            BriefingProjectBoardItem(
+                task_id=t.id, title=t.title, status=t.status,
+                assignee_id=t.assignee_id, priority=t.priority,
+                deadline_sim_time=t.deadline_sim_time,
+                blocked=_is_blocked(t),
+            )
+            for t in not_done[: self.PROJECT_BOARD_CAP]
+        ]
+
     def _wall_clock_label(self, sim_time: int) -> str:
         absolute = self.world.scenario_origin_minute_of_week + sim_time
         day_index = absolute // MINUTES_PER_DAY
@@ -310,10 +351,22 @@ def render_briefing(briefing: Briefing) -> str:
             else:
                 lines.append(f"- {c.kind}: {c.detail.get('from')} — {c.detail.get('body','')[:120]}")
         lines.append("")
-    if briefing.task_deltas:
-        lines.append("## Task board snapshot")
-        for t in briefing.task_deltas[:15]:
-            lines.append(f"- [{t.priority}] {t.task_id} — {t.title} ({t.status}, assignee={t.assignee_id})")
+    if briefing.project_board:
+        lines.append("## Project board (open tasks across the team)")
+        lines.append("_Live state, sorted by priority then deadline. Top "
+                     f"{len(briefing.project_board)} shown._")
+        for t in briefing.project_board:
+            suffix_parts: list[str] = []
+            if t.deadline_sim_time is not None:
+                suffix_parts.append(f"due t={t.deadline_sim_time}")
+            if t.blocked:
+                suffix_parts.append("BLOCKED")
+            suffix = f" ({', '.join(suffix_parts)})" if suffix_parts else ""
+            assignee = t.assignee_id or "unassigned"
+            lines.append(
+                f"- [{t.priority}] {t.task_id} — {t.title} "
+                f"({t.status}, assignee={assignee}){suffix}"
+            )
         lines.append("")
     if briefing.upcoming_calendar:
         lines.append("## Calendar (next 4h)")

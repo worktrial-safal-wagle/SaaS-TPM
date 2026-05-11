@@ -108,7 +108,7 @@ def test_reference_agent_uses_structured_tool_call():
         agent_persona={"id": "person.tpm", "display_name": "TPM",
                        "role": "tpm", "persona_notes": "", "team": None},
         unread_notifications_count=0, unread_chats=[], unread_emails=[],
-        open_commitments=[], task_deltas=[], upcoming_calendar=[],
+        open_commitments=[], project_board=[], upcoming_calendar=[],
     )
     call = agent.decide(briefing)
     # SDK form should be translated back to dot form
@@ -183,3 +183,113 @@ def test_stall_counter_resets_when_sim_time_advances():
     # 0 at start, 1 after first free read, 2 after second, then 0 after the
     # write action (sim_time advanced), then 1 after the next free read.
     assert captured == [0, 1, 2, 0]
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: bounded project board in the briefing
+# ---------------------------------------------------------------------------
+
+
+def _smoke_world_with_extras():
+    """Load smoke and return its runtime; helper for project-board tests so we
+    can add tasks/people directly to a real World instance."""
+    s = load_scenario(SMOKE)
+    rt = build_runtime(s)
+    return s, rt
+
+
+def test_project_board_includes_tasks_across_all_assignees():
+    """TPM coordinates the whole team — the board must show OTHERS' tasks
+    too, not just the agent's."""
+    from sim.store.entities import Person, Task
+    s, rt = _smoke_world_with_extras()
+    rt.world.add_person(Person(id="person.kai", display_name="Kai",
+                               role="eng", team="eng"))
+    rt.world.add_task(Task(
+        id="task.KAI-1", project="proj", title="Kai's work",
+        status="In Progress", assignee_id="person.kai", priority="P0",
+    ))
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    b = assembler.build(now_sim_time=0, last_turn_sim_time=-1)
+    ids = [item.task_id for item in b.project_board]
+    assert "task.SMOKE-1" in ids  # agent's own
+    assert "task.KAI-1" in ids    # other person's — must still be visible
+
+
+def test_project_board_excludes_done_tasks():
+    from sim.store.entities import Person, Task
+    s, rt = _smoke_world_with_extras()
+    rt.world.add_person(Person(id="person.kai", display_name="Kai",
+                               role="eng", team="eng"))
+    rt.world.add_task(Task(
+        id="task.DONE-1", project="proj", title="Already done",
+        status="Done", assignee_id="person.kai", priority="P0",
+    ))
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    b = assembler.build(now_sim_time=0, last_turn_sim_time=-1)
+    ids = [item.task_id for item in b.project_board]
+    assert "task.DONE-1" not in ids
+
+
+def test_project_board_sorts_by_priority_then_deadline():
+    from sim.store.entities import Person, Task
+    s, rt = _smoke_world_with_extras()
+    rt.world.add_person(Person(id="person.kai", display_name="Kai",
+                               role="eng", team="eng"))
+    rt.world.add_task(Task(
+        id="task.P0-LATE", project="proj", title="P0 late",
+        status="Backlog", assignee_id="person.kai",
+        priority="P0", deadline_sim_time=1000,
+    ))
+    rt.world.add_task(Task(
+        id="task.P0-SOON", project="proj", title="P0 soon",
+        status="Backlog", assignee_id="person.kai",
+        priority="P0", deadline_sim_time=100,
+    ))
+    rt.world.add_task(Task(
+        id="task.P1-NONE", project="proj", title="P1 no deadline",
+        status="Backlog", assignee_id="person.kai", priority="P1",
+    ))
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    b = assembler.build(now_sim_time=0, last_turn_sim_time=-1)
+    ids = [item.task_id for item in b.project_board]
+    # P0 sooner-deadline before P0 later-deadline before P1 no-deadline
+    assert ids.index("task.P0-SOON") < ids.index("task.P0-LATE")
+    assert ids.index("task.P0-LATE") < ids.index("task.P1-NONE")
+
+
+def test_project_board_caps_at_twenty():
+    """Bounded so the briefing payload doesn't grow unboundedly."""
+    from sim.store.entities import Person, Task
+    s, rt = _smoke_world_with_extras()
+    rt.world.add_person(Person(id="person.kai", display_name="Kai",
+                               role="eng", team="eng"))
+    for i in range(30):
+        rt.world.add_task(Task(
+            id=f"task.X-{i:02d}", project="proj", title=f"task {i}",
+            status="Backlog", assignee_id="person.kai", priority="P2",
+        ))
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    b = assembler.build(now_sim_time=0, last_turn_sim_time=-1)
+    assert len(b.project_board) == 20
+
+
+def test_project_board_marks_blocked_when_dependency_not_done():
+    from sim.store.entities import Person, Task
+    s, rt = _smoke_world_with_extras()
+    rt.world.add_person(Person(id="person.kai", display_name="Kai",
+                               role="eng", team="eng"))
+    rt.world.add_task(Task(
+        id="task.UPSTREAM", project="proj", title="upstream",
+        status="In Progress", assignee_id="person.kai", priority="P1",
+    ))
+    rt.world.add_task(Task(
+        id="task.DOWNSTREAM", project="proj", title="downstream",
+        status="Backlog", assignee_id="person.kai", priority="P1",
+        depends_on=["task.UPSTREAM"],
+    ))
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    b = assembler.build(now_sim_time=0, last_turn_sim_time=-1)
+    by_id = {item.task_id: item for item in b.project_board}
+    assert by_id["task.DOWNSTREAM"].blocked is True
+    assert by_id["task.UPSTREAM"].blocked is False
