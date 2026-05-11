@@ -56,7 +56,23 @@ def _add_run(sub):
 
 def _cmd_run(args):
     scenario = load_scenario(args.scenario)
-    rt = build_runtime(scenario)
+    # NPC brain: default to Sonnet 4.6 when ANTHROPIC_API_KEY is set so NPCs
+    # actually behave like the characters the persona files describe.
+    # Without it, every NPC trigger fires the default stub brain (effectively
+    # silent), which makes the eval grade one-sided agent outbound rather
+    # than real stakeholder management.
+    npc_brain = None
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        from sim.npc.anthropic_brain import AnthropicNPCBrain
+        npc_brain = AnthropicNPCBrain()
+    else:
+        print(
+            "WARNING: ANTHROPIC_API_KEY not set; NPCs will use the stub brain "
+            "(mostly silent). The eval will only see agent outbound, not "
+            "stakeholder reactions.",
+            file=sys.stderr,
+        )
+    rt = build_runtime(scenario, brain=npc_brain)
     assembler = BriefingAssembler(rt.world, end_sim_time=scenario.config.end_sim_time)
 
     # Set up the logger before driver wires its observer

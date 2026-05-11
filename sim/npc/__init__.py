@@ -9,6 +9,7 @@ from sim.npc.policy import NpcPolicy
 from sim.npc.runtime import NpcRuntime
 
 __all__ = [
+    "AnthropicNPCBrain",
     "BrainCache",
     "NpcBrain",
     "NpcBrainContext",
@@ -17,3 +18,11 @@ __all__ = [
     "NpcRuntime",
     "StubBrain",
 ]
+
+
+def __getattr__(name: str):
+    # Lazy import — only pulls anthropic SDK when actually needed.
+    if name == "AnthropicNPCBrain":
+        from sim.npc.anthropic_brain import AnthropicNPCBrain
+        return AnthropicNPCBrain
+    raise AttributeError(name)
