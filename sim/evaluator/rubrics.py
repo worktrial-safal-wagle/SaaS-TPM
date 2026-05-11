@@ -118,6 +118,7 @@ def _locate_email_thread_body(world: dict[str, Any], loc: dict[str, Any]) -> str
         tid for tid, t in threads.items()
         if subj_substr in (t.get("subject", "")).lower()
     ]
+    candidates: list[dict[str, Any]] = []
     for tid in matching_threads:
         for e in emails:
             if e.get("thread_id") != tid:
@@ -126,38 +127,51 @@ def _locate_email_thread_body(world: dict[str, Any], loc: dict[str, Any]) -> str
                 continue
             if recipient and recipient not in (e.get("to", [])) and recipient not in (e.get("cc", [])):
                 continue
-            return e.get("body", "") or ""
-    return None
+            candidates.append(e)
+    if not candidates:
+        return None
+    # Return the LATEST matching email; an early draft shouldn't outrank the
+    # final send when the agent iterates on a message in the same thread.
+    candidates.sort(key=lambda e: e.get("sim_time", 0))
+    return candidates[-1].get("body", "") or ""
+
+
+def _normalize_for_match(s: str) -> str:
+    """Lowercase and strip non-alphanumeric chars so "ISO-8601" matches "ISO8601"
+    and "date field" matches "datefield". British/US spelling differences must
+    still be enumerated explicitly in the locator's keywords list."""
+    return "".join(ch for ch in s.lower() if ch.isalnum())
 
 
 def _locate_decision_signal_body(world: dict[str, Any], loc: dict[str, Any]) -> str | None:
-    keywords = [kw.lower() for kw in loc.get("keywords_any", [])]
+    raw_keywords = loc.get("keywords_any", [])
+    keywords = [_normalize_for_match(kw) for kw in raw_keywords if kw]
     author = loc.get("author_id")
-    # Search messages, doc edits, doc comments.
+
+    def _hits(body: str) -> bool:
+        norm = _normalize_for_match(body)
+        return any(kw in norm for kw in keywords)
+
     chunks: list[str] = []
     for m in world.get("messages", []):
         if author and m.get("sender_id") != author:
             continue
-        body = (m.get("body") or "").lower()
-        if any(kw in body for kw in keywords):
+        if _hits(m.get("body") or ""):
             chunks.append(m.get("body") or "")
     for d in world.get("docs", []):
         for v in d.get("versions", []):
             if author and v.get("author_id") != author:
                 continue
-            body = (v.get("body") or "").lower()
-            if any(kw in body for kw in keywords):
+            if _hits(v.get("body") or ""):
                 chunks.append(v.get("body") or "")
         for c in d.get("comments", []):
             if author and c.get("author_id") != author:
                 continue
-            body = (c.get("body") or "").lower()
-            if any(kw in body for kw in keywords):
+            if _hits(c.get("body") or ""):
                 chunks.append(c.get("body") or "")
     for e in world.get("emails", []):
         if author and e.get("sender_id") != author:
             continue
-        body = (e.get("body") or "").lower()
-        if any(kw in body for kw in keywords):
+        if _hits(e.get("body") or ""):
             chunks.append(e.get("body") or "")
     return "\n\n---\n\n".join(chunks) if chunks else None

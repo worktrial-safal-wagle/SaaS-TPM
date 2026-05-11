@@ -468,27 +468,32 @@ def _locate_artifact_time(world: dict[str, Any], locator: dict[str, Any]) -> int
                 candidates.append(int(e.get("sim_time") or 0))
         return min(candidates) if candidates else None
     if kind == "decision_signal":
-        keywords = [kw.lower() for kw in locator.get("keywords_any", [])]
+        # Normalized fuzzy match (see rubrics._normalize_for_match) — duplicated
+        # locally to keep metrics.py self-contained. Same semantics: lowercase
+        # + strip non-alphanumerics so "ISO-8601" matches "ISO8601".
+        def _norm(s: str) -> str:
+            return "".join(ch for ch in s.lower() if ch.isalnum())
+        keywords = [_norm(kw) for kw in locator.get("keywords_any", []) if kw]
         author = locator.get("author_id")
         candidates: list[int] = []
+        def _hit(body: str) -> bool:
+            normed = _norm(body)
+            return any(kw in normed for kw in keywords)
         for m in world.get("messages", []):
             if author and m.get("sender_id") != author:
                 continue
-            body = (m.get("body") or "").lower()
-            if any(kw in body for kw in keywords):
+            if _hit(m.get("body") or ""):
                 candidates.append(int(m.get("sim_time") or 0))
         for d in world.get("docs", []):
             for v in d.get("versions", []):
                 if author and v.get("author_id") != author:
                     continue
-                body = (v.get("body") or "").lower()
-                if any(kw in body for kw in keywords):
+                if _hit(v.get("body") or ""):
                     candidates.append(int(v.get("sim_time") or 0))
         for e in world.get("emails", []):
             if author and e.get("sender_id") != author:
                 continue
-            body = (e.get("body") or "").lower()
-            if any(kw in body for kw in keywords):
+            if _hit(e.get("body") or ""):
                 candidates.append(int(e.get("sim_time") or 0))
         return min(candidates) if candidates else None
     return None
