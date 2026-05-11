@@ -29,7 +29,11 @@ from pydantic import BaseModel, ConfigDict, Field
 from sim.evaluator.judge import CachedJudge, Judge, RubricVerdict, StubJudge
 from sim.evaluator.metrics import (
     MetricResult,
+    anti_hack_forbidden_external_keywords,
+    anti_hack_forbidden_log_work,
     anti_hack_max_messages,
+    anti_hack_must_consult_before_decision,
+    anti_hack_per_channel_volume,
     deadline_hit_rate,
     error_rate,
     repeat_read_rate,
@@ -79,6 +83,7 @@ class MetricSerialized(BaseModel):
     normalized: float
     raw: float
     detail: dict[str, Any]
+    contributes: bool = True
 
 
 class JudgeAxis(BaseModel):
@@ -108,7 +113,7 @@ class FinalEvaluation(BaseModel):
 def _to_serialized(m: MetricResult) -> MetricSerialized:
     return MetricSerialized(
         name=m.name, tier=m.tier, normalized=m.normalized,
-        raw=m.raw, detail=m.detail,
+        raw=m.raw, detail=m.detail, contributes=m.contributes,
     )
 
 
@@ -134,6 +139,10 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
         turns_per_sim_hour(run_dir),
         repeat_read_rate(run_dir),
         anti_hack_max_messages(run_dir, eval_truth),
+        anti_hack_per_channel_volume(run_dir, eval_truth),
+        anti_hack_forbidden_external_keywords(run_dir, eval_truth),
+        anti_hack_must_consult_before_decision(run_dir, eval_truth),
+        anti_hack_forbidden_log_work(run_dir, eval_truth),
     ]
     if full_run:
         metrics.append(deadline_hit_rate(run_dir, eval_truth))
@@ -189,7 +198,9 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
         )
 
     judge_mean = sum(a.score for a in axes.values()) / max(1, len(axes))
-    composite_inputs = [m.normalized for m in metrics] + [a.score for a in axes.values()]
+    composite_inputs = [m.normalized for m in metrics if m.contributes] + [
+        a.score for a in axes.values()
+    ]
     composite = sum(composite_inputs) / max(1, len(composite_inputs))
 
     return FinalEvaluation(
