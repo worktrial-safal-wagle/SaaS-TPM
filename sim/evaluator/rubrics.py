@@ -48,6 +48,11 @@ class ArtifactScore:
     normalized_score: float  # in [-1, +1]
     items: list[dict[str, Any]]
     raw_body: str = ""
+    # The judge couldn't produce a verdict for this artifact (API error or
+    # malformed JSON after retries). The caller should exclude failed artifacts
+    # from the mean rather than treat them as half-passing.
+    failed: bool = False
+    failure_reason: str = ""
 
 
 def score_artifact(
@@ -77,10 +82,20 @@ def score_artifact(
         system_prompt=ARTIFACT_JUDGE_SYSTEM_PROMPT,
         user_payload=user_payload,
     )
+    if verdict.failed:
+        # Judge couldn't score it. Don't fabricate a 0.5 pass rate; surface
+        # the failure so the caller can exclude it from the artifact mean.
+        return ArtifactScore(
+            artifact_id=artifact_yaml["id"], found=True,
+            pass_rate=0.0, normalized_score=0.0, items=[],
+            raw_body=body, failed=True,
+            failure_reason=verdict.rationale or "judge_failed",
+        )
     items = verdict.raw.get("items") if verdict.raw else None
     if not items:
-        # Fall back to the bounded score the judge returned, treating
-        # +1.0 as full pass and -1.0 as full fail.
+        # The judge returned a verdict but skipped the per-item structure
+        # (e.g., a single-axis score with no rubric breakdown). Treat the
+        # bounded score as the source of truth.
         pr = max(0.0, min(1.0, (verdict.score + 1) / 2))
         return ArtifactScore(
             artifact_id=artifact_yaml["id"], found=True,

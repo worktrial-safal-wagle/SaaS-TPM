@@ -90,6 +90,7 @@ class JudgeAxis(BaseModel):
     model_config = ConfigDict(extra="forbid")
     score: float
     rationale: str
+    failed: bool = False
 
 
 class JudgeSection(BaseModel):
@@ -108,6 +109,10 @@ class FinalEvaluation(BaseModel):
     judge: JudgeSection
     artifacts: list[dict[str, Any]] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
+    # Judge calls that couldn't produce a verdict (API error after retries,
+    # malformed JSON, or missing axis). These are reported here for visibility
+    # and excluded from the composite mean — neither rewarded nor penalized.
+    errors: list[str] = Field(default_factory=list)
 
 
 def _to_serialized(m: MetricResult) -> MetricSerialized:
@@ -153,6 +158,8 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
     for art in eval_truth.get("artifacts", []) or []:
         artifact_scores.append(score_artifact(art, run_dir, eval_truth, cached_judge))
 
+    errors: list[str] = []
+
     # Judge axes (decision_hygiene gets the artifact-rubric pass-rate folded in)
     axes_payload = _build_axes_payload(world, run_dir)
     axes_verdict = cached_judge.evaluate(
@@ -162,11 +169,23 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
     axes_data = axes_verdict.raw if axes_verdict.raw else {}
     axes: dict[str, JudgeAxis] = {}
     for axis_name in ("specificity", "decision_hygiene", "risk_escalation"):
-        a = axes_data.get(axis_name) or {}
-        axes[axis_name] = JudgeAxis(
-            score=float(a.get("score", 0.0)),
-            rationale=str(a.get("rationale", "")),
-        )
+        a = axes_data.get(axis_name)
+        if axes_verdict.failed or a is None:
+            axes[axis_name] = JudgeAxis(
+                score=0.0,
+                rationale=axes_verdict.rationale if axes_verdict.failed
+                          else "axis_missing_from_judge_response",
+                failed=True,
+            )
+            errors.append(
+                f"axes.{axis_name}: " +
+                ("judge_failed" if axes_verdict.failed else "axis_missing")
+            )
+        else:
+            axes[axis_name] = JudgeAxis(
+                score=float(a.get("score", 0.0)),
+                rationale=str(a.get("rationale", "")),
+            )
 
     if full_run:
         state_acc = cached_judge.evaluate(
@@ -174,7 +193,12 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
             user_payload=json.dumps(_build_state_accuracy_payload(world, run_dir)),
         )
         sa_data = state_acc.raw.get("state_accuracy") if state_acc.raw else None
-        if sa_data:
+        if state_acc.failed:
+            axes["state_accuracy"] = JudgeAxis(
+                score=0.0, rationale=state_acc.rationale, failed=True,
+            )
+            errors.append(f"axes.state_accuracy: judge_failed")
+        elif sa_data:
             axes["state_accuracy"] = JudgeAxis(
                 score=float(sa_data.get("score", 0.0)),
                 rationale=str(sa_data.get("rationale", "")),
@@ -184,22 +208,39 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
                 score=float(state_acc.score), rationale=state_acc.rationale,
             )
 
-    # Fold artifact rubric pass-rates into decision_hygiene as an average.
-    if artifact_scores:
-        artifact_mean = sum(a.normalized_score for a in artifact_scores) / len(artifact_scores)
-        # Average judge's decision_hygiene + artifact mean for the final axis.
-        decision_score = (axes["decision_hygiene"].score + artifact_mean) / 2
-        axes["decision_hygiene"] = JudgeAxis(
-            score=decision_score,
-            rationale=(
-                f"judge:{axes['decision_hygiene'].rationale} | "
-                f"artifacts:{artifact_mean:+.2f}"
-            ),
-        )
+    # Surface artifact-judge failures as errors, exclude them from the
+    # artifact mean (don't fabricate a half-pass score).
+    for a in artifact_scores:
+        if a.failed:
+            errors.append(f"artifact.{a.artifact_id}: {a.failure_reason or 'judge_failed'}")
+    scored_artifacts = [a for a in artifact_scores if not a.failed]
 
-    judge_mean = sum(a.score for a in axes.values()) / max(1, len(axes))
+    # Fold artifact rubric pass-rates into decision_hygiene. If the axis judge
+    # failed but the artifact judges succeeded, the artifacts are the only
+    # signal we have for that axis — use them to recover the score rather than
+    # dropping the axis entirely.
+    if scored_artifacts:
+        artifact_mean = sum(a.normalized_score for a in scored_artifacts) / len(scored_artifacts)
+        if axes["decision_hygiene"].failed:
+            axes["decision_hygiene"] = JudgeAxis(
+                score=artifact_mean,
+                rationale=f"axes_judge_failed; using artifact_mean={artifact_mean:+.2f}",
+            )
+        else:
+            decision_score = (axes["decision_hygiene"].score + artifact_mean) / 2
+            axes["decision_hygiene"] = JudgeAxis(
+                score=decision_score,
+                rationale=(
+                    f"judge:{axes['decision_hygiene'].rationale} | "
+                    f"artifacts:{artifact_mean:+.2f}"
+                ),
+            )
+
+    judge_mean = sum(a.score for a in axes.values() if not a.failed) / max(
+        1, sum(1 for a in axes.values() if not a.failed)
+    )
     composite_inputs = [m.normalized for m in metrics if m.contributes] + [
-        a.score for a in axes.values()
+        a.score for a in axes.values() if not a.failed
     ]
     composite = sum(composite_inputs) / max(1, len(composite_inputs))
 
@@ -216,6 +257,8 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
                 "pass_rate": a.pass_rate,
                 "normalized_score": a.normalized_score,
                 "items": a.items,
+                "failed": a.failed,
+                "failure_reason": a.failure_reason,
             }
             for a in artifact_scores
         ],
@@ -223,6 +266,7 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
             f"final_sim_time={final_sim_time}",
             f"end_sim_time={scenario_cfg.get('end_sim_time')}",
         ],
+        errors=errors,
     )
 
 

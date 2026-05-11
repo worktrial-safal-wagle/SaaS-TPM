@@ -11,18 +11,25 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import time
 from typing import Any, Callable, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class RubricVerdict(BaseModel):
-    """A single judge verdict — bounded score in [-1, +1] plus rationale."""
+    """A single judge verdict — bounded score in [-1, +1] plus rationale.
+
+    `failed` indicates that the judge could not produce a real verdict
+    (API error after retries, malformed response, missing axis). The caller
+    is expected to exclude failed verdicts from the composite mean and
+    surface them as errors in the scorecard."""
 
     model_config = ConfigDict(extra="forbid")
     score: float = Field(ge=-1.0, le=1.0)
     rationale: str = ""
     raw: dict[str, Any] = Field(default_factory=dict)
+    failed: bool = False
 
 
 class Judge(Protocol):
@@ -72,7 +79,13 @@ class CachedJudge:
 
 
 class AnthropicJudge:
-    def __init__(self, model: str = "claude-haiku-4-5-20251001", max_tokens: int = 512) -> None:
+    def __init__(
+        self,
+        model: str = "claude-haiku-4-5-20251001",
+        max_tokens: int = 512,
+        max_attempts: int = 3,
+        backoff_base_seconds: float = 1.0,
+    ) -> None:
         try:
             import anthropic  # type: ignore
         except ImportError as e:
@@ -83,14 +96,36 @@ class AnthropicJudge:
         self._client = anthropic.Anthropic(api_key=api_key)
         self._model = model
         self._max_tokens = max_tokens
+        self._max_attempts = max(1, max_attempts)
+        self._backoff_base = backoff_base_seconds
 
     def evaluate(self, *, system_prompt: str, user_payload: str) -> RubricVerdict:
-        response = self._client.messages.create(
-            model=self._model, max_tokens=self._max_tokens, temperature=0,
-            system=[{"type": "text", "text": system_prompt,
-                     "cache_control": {"type": "ephemeral"}}],
-            messages=[{"role": "user", "content": user_payload}],
-        )
+        # Transient API errors get exponential-backoff retries; parse errors
+        # do not (temperature=0 means the model returns the same bytes, so
+        # retrying just burns tokens). On final failure we return a marked
+        # verdict — the final evaluator excludes failed verdicts from the
+        # composite mean rather than blending a silent 0.0 into the score.
+        last_exc: Exception | None = None
+        response = None
+        for attempt in range(self._max_attempts):
+            try:
+                response = self._client.messages.create(
+                    model=self._model, max_tokens=self._max_tokens, temperature=0,
+                    system=[{"type": "text", "text": system_prompt,
+                             "cache_control": {"type": "ephemeral"}}],
+                    messages=[{"role": "user", "content": user_payload}],
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt + 1 < self._max_attempts:
+                    time.sleep(self._backoff_base * (2 ** attempt))
+        if response is None:
+            return RubricVerdict(
+                score=0.0,
+                rationale=f"api_error_after_{self._max_attempts}_attempts: {last_exc!s}"[:240],
+                failed=True,
+            )
         text = "".join(b.text for b in response.content if getattr(b, "type", "") == "text")
         try:
             data = _extract_json(text)
@@ -99,8 +134,12 @@ class AnthropicJudge:
                 rationale=str(data.get("rationale", "")),
                 raw=data,
             )
-        except Exception:
-            return RubricVerdict(score=0.0, rationale=f"failed_to_parse: {text[:200]}")
+        except Exception as exc:
+            return RubricVerdict(
+                score=0.0,
+                rationale=f"parse_error: {exc!s} | text={text[:200]}",
+                failed=True,
+            )
 
 
 def _extract_json(text: str) -> dict[str, Any]:

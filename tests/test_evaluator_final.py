@@ -503,3 +503,150 @@ def test_anti_hack_signals_not_declared_do_not_contribute(tmp_path):
         result = fn(rd, eval_truth)
         assert result.contributes is False, f"{fn.__name__} should not contribute"
         assert result.detail.get("reason") == "signal_not_declared"
+
+
+# ---------------------------------------------------------------------------
+# Phase 1d: judge failures are surfaced, not silently converted to 0.0
+# ---------------------------------------------------------------------------
+
+
+def _all_failing_judge():
+    return StubJudge(lambda sp, up: RubricVerdict(
+        score=0.0, rationale="simulated api timeout", failed=True,
+    ))
+
+
+def _axes_failing_artifacts_ok_judge():
+    """Fails on the main axes call; succeeds on artifact rubrics and state_accuracy."""
+    def fn(sp, up):
+        if "rubric" in sp:
+            return RubricVerdict(
+                score=0.33,
+                raw={"items": [{"pass": True}, {"pass": True}, {"pass": False}]},
+            )
+        if "state_accuracy" in sp:
+            return RubricVerdict(
+                score=0.5,
+                raw={"state_accuracy": {"score": 0.5, "rationale": "ok"}},
+            )
+        return RubricVerdict(score=0.0, rationale="axes timeout", failed=True)
+    return StubJudge(fn)
+
+
+def test_failing_axes_judge_marks_axes_and_surfaces_errors(tmp_path):
+    """All slice_safe axes failed → each marked failed and listed in errors."""
+    rd = _drive_smoke(tmp_path, [
+        ToolCall(tool="tasks.update_status",
+                 args={"task_id": "task.SMOKE-1", "status": "Done"}),
+    ])
+    result = grade_and_write(rd, judge=_all_failing_judge())
+    for axis in ("specificity", "decision_hygiene", "risk_escalation"):
+        assert result.judge.axes[axis].failed is True, f"{axis} should be failed"
+    assert any("specificity" in e for e in result.errors)
+    assert any("risk_escalation" in e for e in result.errors)
+
+
+def test_score_artifact_marks_judge_failure_not_half_pass(tmp_path):
+    """Failed artifact judge → ArtifactScore.failed=True, not a faked 0.5 pass."""
+    from sim.evaluator.rubrics import score_artifact
+    world = {
+        "messages": [], "channels": [],
+        "emails": [{
+            "id": "e.1", "thread_id": "t.1", "sender_id": "person.tpm",
+            "to": ["person.alex"], "cc": [],
+            "body": "the launch is ready", "sim_time": 3000,
+        }],
+        "email_threads": [{"id": "t.1", "subject": "launch readiness"}],
+        "tasks": [], "docs": [], "people": [],
+    }
+    (tmp_path / "world_final.json").write_text(json.dumps(world))
+    artifact_yaml = {
+        "id": "fake_artifact", "description": "test",
+        "locator": {
+            "kind": "email_thread",
+            "thread_subject_contains": "launch",
+            "sender_id": "person.tpm",
+            "recipient_id": "person.alex",
+        },
+        "rubric": ["concrete date is named"],
+    }
+    failing_judge = StubJudge(
+        lambda sp, up: RubricVerdict(
+            score=0.0, rationale="simulated timeout", failed=True,
+        )
+    )
+    score = score_artifact(artifact_yaml, tmp_path, {}, failing_judge)
+    assert score.found is True
+    assert score.failed is True
+    assert score.failure_reason == "simulated timeout"
+    assert score.pass_rate == 0.0
+
+
+def test_decision_hygiene_recovered_from_artifacts_when_axes_judge_fails(tmp_path):
+    """Axes judge fails but artifact judge succeeds → decision_hygiene takes
+    artifact_mean as its score rather than being dropped."""
+    import yaml
+    rd = _drive_smoke(tmp_path, [])
+    # Inject an artifact-bearing email into the world snapshot and an artifact
+    # definition into the run's eval.yaml so the artifact path runs.
+    world_path = rd / "world_final.json"
+    world = json.loads(world_path.read_text())
+    world.setdefault("email_threads", []).append({
+        "id": "t.fake", "subject": "launch readiness"
+    })
+    world.setdefault("emails", []).append({
+        "id": "e.fake", "thread_id": "t.fake", "sender_id": "person.tpm",
+        "to": ["person.tpm"], "cc": [],
+        "body": "ready to ship Wednesday", "sim_time": 100,
+    })
+    world_path.write_text(json.dumps(world))
+
+    eval_path = rd / "scenario" / "eval.yaml"
+    existing = yaml.safe_load(eval_path.read_text()) or {}
+    existing.setdefault("artifacts", []).append({
+        "id": "test_artifact",
+        "description": "test artifact",
+        "locator": {
+            "kind": "email_thread",
+            "thread_subject_contains": "launch",
+            "sender_id": "person.tpm",
+            "recipient_id": "person.tpm",
+        },
+        "rubric": ["item one", "item two", "item three"],
+    })
+    eval_path.write_text(yaml.safe_dump(existing))
+
+    result = grade_and_write(rd, judge=_axes_failing_artifacts_ok_judge())
+    assert result.judge.axes["decision_hygiene"].failed is False
+    assert "artifact_mean" in result.judge.axes["decision_hygiene"].rationale
+    assert result.judge.axes["specificity"].failed is True
+    assert result.judge.axes["risk_escalation"].failed is True
+
+
+def test_missing_axis_in_judge_response_marked_failed(tmp_path):
+    """Judge succeeds overall but omits an axis → that axis is marked failed."""
+    def fn(sp, up):
+        if "rubric" in sp:
+            return RubricVerdict(
+                score=0.33,
+                raw={"items": [{"pass": True}, {"pass": False}]},
+            )
+        if "state_accuracy" in sp:
+            return RubricVerdict(
+                score=0.5,
+                raw={"state_accuracy": {"score": 0.5, "rationale": "ok"}},
+            )
+        # Deliberately omit risk_escalation
+        return RubricVerdict(score=0.4, raw={
+            "specificity":      {"score": 0.5, "rationale": "ok"},
+            "decision_hygiene": {"score": 0.4, "rationale": "ok"},
+        })
+    rd = _drive_smoke(tmp_path, [
+        ToolCall(tool="tasks.update_status",
+                 args={"task_id": "task.SMOKE-1", "status": "Done"}),
+    ])
+    result = grade_and_write(rd, judge=StubJudge(fn))
+    assert result.judge.axes["risk_escalation"].failed is True
+    assert result.judge.axes["specificity"].failed is False
+    assert result.judge.axes["decision_hygiene"].failed is False
+    assert any("risk_escalation" in e for e in result.errors)
