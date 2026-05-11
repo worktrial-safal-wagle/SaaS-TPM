@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -113,8 +114,22 @@ def _add_grade(sub):
 
 def _cmd_grade(args):
     from sim.evaluator.final import grade_and_write
-    result = grade_and_write(args.run_dir)
+    from sim.evaluator.judge import AnthropicJudge
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        judge = AnthropicJudge()
+    else:
+        print(
+            "WARNING: ANTHROPIC_API_KEY not set; the LLM judge will not run. "
+            "All judge axes and per-artifact rubrics will score 0.0 from a stub.",
+            file=sys.stderr,
+        )
+        judge = None
+    result = grade_and_write(args.run_dir, judge=judge)
     print(f"composite_score: {result.composite_score:+.3f} (tier={result.tier_used})")
+    if result.errors:
+        print(f"  {len(result.errors)} judge issue(s):", file=sys.stderr)
+        for e in result.errors:
+            print(f"    - {e}", file=sys.stderr)
     return 0
 
 
