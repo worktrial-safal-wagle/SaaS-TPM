@@ -259,6 +259,20 @@ class NpcRuntime:
         self, npc: Person, trigger_kind: str, trigger_payload: dict
     ) -> NpcBrainContext:
         excerpt = self._excerpt_for_trigger(trigger_kind, trigger_payload)
+        # Tool schemas the brain needs to know about: the NPC's allowed tools
+        # only, with names converted from SDK form ("chat__send") back to dot
+        # form ("chat.send") for prompt readability. Without these schemas the
+        # brain hallucinates arg names and every NPC tool call fails validation.
+        registry = self.npc_registries.get(npc.id)
+        available_tools: list[dict] = []
+        if registry is not None:
+            for spec in registry.tool_specs():
+                dotted = spec.get("name", "").replace("__", ".")
+                available_tools.append({
+                    "name": dotted,
+                    "description": spec.get("description", ""),
+                    "input_schema": spec.get("input_schema", {}),
+                })
         return NpcBrainContext(
             npc_id=npc.id,
             persona_role=npc.role,
@@ -267,6 +281,7 @@ class NpcRuntime:
             trigger_kind=trigger_kind,
             trigger_payload=trigger_payload,
             context_excerpt=excerpt,
+            available_tools=available_tools,
         )
 
     def _excerpt_for_trigger(self, kind: str, payload: dict) -> str:

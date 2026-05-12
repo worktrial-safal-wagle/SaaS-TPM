@@ -30,6 +30,12 @@ class NpcBrainContext(BaseModel):
     trigger_payload: dict[str, Any] = Field(default_factory=dict)
     # Compact view of relevant prior state — channel snippet, task snapshot, etc.
     context_excerpt: str = ""
+    # Tools the NPC is authorized to use. Each entry is
+    # {"name": "<dot.form>", "description": "...", "input_schema": <jsonschema>}.
+    # Passed in so the brain knows exact arg names — without this it
+    # hallucinates parameter names (e.g., to_user_id instead of recipient_id)
+    # and every NPC tool call gets rejected at dispatch time.
+    available_tools: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class NpcBrainOutput(BaseModel):

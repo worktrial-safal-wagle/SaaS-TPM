@@ -55,13 +55,21 @@ Your persona:
 Hidden knowledge you have (others may not):
 {knowledge_block}
 
+TOOLS YOU ARE AUTHORIZED TO USE (use the exact arg names shown):
+{tool_schemas}
+
 Behavior rules:
-- React as a real {role} would. One or two concrete sentences. No essays,
-  no meta-commentary, no out-of-character narration.
+- React as a real {role} would. One or two concrete sentences in the body.
+  No essays, no meta-commentary, no out-of-character narration.
 - Match the medium: reply to a DM with chat.dm; reply to an @-mention with
   chat.send in the same channel; reply to an email with email.send.
-- "Ignore" is a valid response. If the trigger doesn't warrant a reaction,
-  return an empty tool_calls list. You don't have to act every time.
+- Use the EXACT arg names from the schemas above. Common mistakes to avoid:
+  chat.dm takes `recipient_id` (NOT `to_user_id` or `user_id`); chat.send
+  takes `channel_id` (NOT `channel`); email.send takes `to` as a LIST.
+- When the trigger is a direct ask from the TPM, REPLY. Silence on a direct
+  ask is out of character. Only return empty tool_calls if the trigger is
+  truly not addressed to you (e.g., a channel message that doesn't mention
+  you and isn't about your work).
 - Don't role-play omniscience. You only know what's in your persona, your
   hidden knowledge, and what's visible in the trigger + relevant context
   below.
@@ -69,10 +77,10 @@ Behavior rules:
 - Don't fabricate facts you wouldn't actually have. If you don't know, say
   so plainly.
 
-You will respond by calling the `npc_act` tool exactly once. Use empty
-tool_calls to stay silent. Use `speech` only when trigger_kind is
-"meeting_turn" — otherwise leave it null. `rationale` is one short sentence
-on why you reacted (or didn't).
+You will respond by calling the `npc_act` tool exactly once. tool_calls is
+a list — you can include MULTIPLE tool calls (e.g., reply with chat.dm AND
+comment on a task). Use `speech` only when trigger_kind is "meeting_turn".
+`rationale` is one short sentence on why you reacted (or didn't).
 """
 
 
@@ -221,11 +229,25 @@ class AnthropicNPCBrain:
             )
         else:
             knowledge_block = "(no privileged knowledge beyond what's visible to everyone)"
+        tool_schemas = self._render_tool_schemas(context.available_tools)
         return SYSTEM_PROMPT_TEMPLATE.format(
             role=context.persona_role or "coworker",
             persona_notes=context.persona_notes or "(no specific persona notes)",
             knowledge_block=knowledge_block,
+            tool_schemas=tool_schemas,
         )
+
+    def _render_tool_schemas(self, tools: list[dict[str, Any]]) -> str:
+        if not tools:
+            return "(no tools available — your only option is to ignore)"
+        blocks: list[str] = []
+        for t in tools:
+            schema = json.dumps(t.get("input_schema", {}), indent=2)
+            blocks.append(
+                f"- {t.get('name', '<unknown>')} — {t.get('description', '')}\n"
+                f"  args schema:\n{schema}"
+            )
+        return "\n\n".join(blocks)
 
     def _build_user_message(self, context: NpcBrainContext) -> str:
         # Cap the payload JSON to keep tokens bounded on pathological inputs
