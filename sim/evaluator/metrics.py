@@ -109,6 +109,13 @@ def turns_per_sim_hour(run_dir: Path) -> MetricResult:
 
 
 TIGHT_LOOP_THRESHOLD = 3
+# Tools where identical consecutive calls reflect chunked work, not stuck
+# behaviour. `tasks.log_work` is the load-bearing case: an agent logging 5
+# hours of work on a task does five identical-args log_work calls, but
+# that's 5 hours of real productive output, not 5 turns of spinning.
+# Excluded tools still BREAK other streaks (the agent did something else)
+# — they just don't form streaks themselves.
+TIGHT_LOOP_EXCLUDED_TOOLS = {"tasks.log_work"}
 
 
 def tight_loop_rate(run_dir: Path) -> MetricResult:
@@ -148,16 +155,28 @@ def tight_loop_rate(run_dir: Path) -> MetricResult:
     current_key: tuple[str, str] | None = None
     current_count = 0
 
+    def _close_streak() -> None:
+        nonlocal loop_turns, longest_loop, longest_loop_key
+        if current_count >= TIGHT_LOOP_THRESHOLD:
+            loop_turns += current_count
+            if current_count > longest_loop:
+                longest_loop = current_count
+                longest_loop_key = current_key
+
     for t in turns:
-        key = (t.get("tool", ""), args_sig(t.get("args")))
+        tool = t.get("tool", "")
+        if tool in TIGHT_LOOP_EXCLUDED_TOOLS:
+            # Chunked-work tool — close any existing streak (the agent did
+            # something else) but don't form a new streak from these calls.
+            _close_streak()
+            current_key = None
+            current_count = 0
+            continue
+        key = (tool, args_sig(t.get("args")))
         if key == current_key:
             current_count += 1
         else:
-            if current_count >= TIGHT_LOOP_THRESHOLD:
-                loop_turns += current_count
-                if current_count > longest_loop:
-                    longest_loop = current_count
-                    longest_loop_key = current_key
+            _close_streak()
             current_key = key
             current_count = 1
     if current_count >= TIGHT_LOOP_THRESHOLD:
@@ -625,7 +644,19 @@ def _agent_contacted_person_before(
     world: dict[str, Any], agent_id: str, person_id: str, sim_time: int,
     channels_by_id: dict[str, dict[str, Any]],
 ) -> bool:
-    """True if the agent messaged or emailed person_id strictly before sim_time."""
+    """True if the agent has had contact with person_id strictly before sim_time.
+
+    "Contact" means any of:
+      - DM to person_id (in a DM channel that includes both)
+      - @-mention of person_id in any channel message
+      - email to/cc person_id
+      - **co-attendance of a meeting** — if both the agent and person_id were
+        attendees of a calendar event with end_sim_time < sim_time AND the
+        agent actually attended (attended_by_agent=True), that's consultation.
+        Meetings ARE consultation in TPM work; not counting them is the
+        false-positive the audit caught.
+    """
+    # Direct chat contact (DM or mention)
     for m in world.get("messages", []):
         if m.get("sender_id") != agent_id:
             continue
@@ -636,11 +667,19 @@ def _agent_contacted_person_before(
         in_dm = bool(ch.get("is_dm")) and person_id in (ch.get("members") or [])
         if mentioned or in_dm:
             return True
+    # Direct email contact
     for e in world.get("emails", []):
         if e.get("sender_id") != agent_id:
             continue
         if int(e.get("sim_time") or 0) >= sim_time:
             continue
         if person_id in (e.get("to") or []) or person_id in (e.get("cc") or []):
+            return True
+    # Meeting co-attendance
+    for event in world.get("calendar", []) or world.get("calendar_events", []) or []:
+        if int(event.get("end_sim_time") or 0) >= sim_time:
+            continue
+        attendees = event.get("attendees") or []
+        if agent_id in attendees and person_id in attendees and event.get("attended_by_agent"):
             return True
     return False

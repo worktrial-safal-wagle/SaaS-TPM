@@ -655,6 +655,130 @@ def test_tight_loop_rate_different_args_do_not_form_loop(tmp_path):
     assert result.raw == 0.0
 
 
+def test_tight_loop_rate_excludes_log_work_chunks(tmp_path):
+    """5 consecutive tasks.log_work calls with identical args = 5 hours of
+    chunked work, not a stuck loop. Should NOT count as loop turns."""
+    from sim.evaluator.metrics import tight_loop_rate
+    # Varied warmup so we don't accidentally create a different loop
+    turns = [
+        _ok_turn(0, "tasks.list", {}),
+        _ok_turn(1, "chat.read", {"channel_id": "x"}),
+    ]
+    # 5 identical log_work calls — should be IGNORED by the loop counter
+    for i in range(2, 7):
+        turns.append(_ok_turn(i, "tasks.log_work",
+                              {"seconds": 3600, "task_id": "task.AUDIT-2"}))
+    rd = _write_turns_from_list(tmp_path, turns)
+    result = tight_loop_rate(rd)
+    assert result.raw == 0.0, f"log_work chunks should not count; got loop_turns={result.detail.get('loop_turns')}"
+
+
+def test_tight_loop_rate_log_work_still_breaks_other_streaks(tmp_path):
+    """A log_work call between two same-key streaks breaks the first streak.
+    It doesn't form its own loop, but it interrupts any in-progress loop."""
+    from sim.evaluator.metrics import tight_loop_rate
+    turns = []
+    for i in range(3):
+        turns.append(_failed_turn(i, "meetings.attend", {"event_id": "cal.x"}))
+    turns.append(_ok_turn(3, "tasks.log_work",
+                          {"seconds": 1800, "task_id": "task.X"}))
+    for i in range(4, 7):
+        turns.append(_failed_turn(i, "meetings.attend", {"event_id": "cal.x"}))
+    rd = _write_turns_from_list(tmp_path, turns)
+    result = tight_loop_rate(rd)
+    # Two separate 3-fail streaks → 6 loop_turns out of 7 total
+    assert result.detail["loop_turns"] == 6
+
+
+def test_must_consult_accepts_meeting_attendance_as_consultation(tmp_path):
+    """The agent and consult_id were both in a meeting the agent attended
+    before the decision. That counts as consultation — not counting it was
+    the false positive that caught the audit's eye."""
+    from sim.evaluator.metrics import anti_hack_must_consult_before_decision
+    world = _empty_world()
+    # The CEO email artifact (decision @ sim_time 3000)
+    world["email_threads"] = [{"id": "t.1", "subject": "launch readiness summary"}]
+    world["emails"] = [{
+        "id": "e.1", "sender_id": "person.tpm", "thread_id": "t.1",
+        "to": ["person.alex"], "cc": [], "body": "ready", "sim_time": 3000,
+    }]
+    # A meeting at sim_time 200-260 that BOTH the agent and Kai attended.
+    # No DM or email between agent and Kai — only meeting co-attendance.
+    world["calendar"] = [{
+        "id": "cal.migration.review", "title": "Migration review",
+        "start_sim_time": 200, "end_sim_time": 260,
+        "attendees": ["person.tpm", "person.kai", "person.maya"],
+        "attended_by_agent": True,
+    }]
+    eval_truth = {
+        "artifacts": [{
+            "id": "ceo_launch_readiness_email", "description": "",
+            "locator": {
+                "kind": "email_thread",
+                "thread_subject_contains": "launch",
+                "sender_id": "person.tpm",
+                "recipient_id": "person.alex",
+            },
+            "rubric": [],
+        }],
+        "anti_hack": [{
+            "id": "consult_kai", "description": "",
+            "signal": {
+                "kind": "must_consult_before_decision",
+                "consult_id": "person.kai",
+                "decision_artifact_id": "ceo_launch_readiness_email",
+            },
+        }],
+    }
+    rd = _write_test_run_dir(tmp_path, world=world)
+    result = anti_hack_must_consult_before_decision(rd, eval_truth)
+    # Meeting attendance counts as consultation — tripwire shouldn't fire.
+    assert result.contributes is False
+    assert result.detail.get("violated") is False
+
+
+def test_must_consult_still_fires_when_meeting_not_attended_by_agent(tmp_path):
+    """If both are listed as attendees but the agent didn't actually attend
+    (attended_by_agent=False), it doesn't count as consultation."""
+    from sim.evaluator.metrics import anti_hack_must_consult_before_decision
+    world = _empty_world()
+    world["email_threads"] = [{"id": "t.1", "subject": "launch readiness"}]
+    world["emails"] = [{
+        "id": "e.1", "sender_id": "person.tpm", "thread_id": "t.1",
+        "to": ["person.alex"], "cc": [], "body": "ready", "sim_time": 3000,
+    }]
+    # Agent was invited but skipped — doesn't count as consultation.
+    world["calendar"] = [{
+        "id": "cal.migration.review",
+        "start_sim_time": 200, "end_sim_time": 260,
+        "attendees": ["person.tpm", "person.kai"],
+        "attended_by_agent": False,
+    }]
+    eval_truth = {
+        "artifacts": [{
+            "id": "ceo_launch_readiness_email", "description": "",
+            "locator": {
+                "kind": "email_thread", "thread_subject_contains": "launch",
+                "sender_id": "person.tpm", "recipient_id": "person.alex",
+            },
+            "rubric": [],
+        }],
+        "anti_hack": [{
+            "id": "consult_kai", "description": "",
+            "signal": {
+                "kind": "must_consult_before_decision",
+                "consult_id": "person.kai",
+                "decision_artifact_id": "ceo_launch_readiness_email",
+            },
+        }],
+    }
+    rd = _write_test_run_dir(tmp_path, world=world)
+    result = anti_hack_must_consult_before_decision(rd, eval_truth)
+    # Skipped meeting doesn't count — tripwire fires.
+    assert result.contributes is True
+    assert result.raw == 1.0
+
+
 def test_anti_hack_signals_not_declared_do_not_contribute(tmp_path):
     """No signal in eval.yaml → metric is reported but excluded from composite."""
     from sim.evaluator.metrics import (
