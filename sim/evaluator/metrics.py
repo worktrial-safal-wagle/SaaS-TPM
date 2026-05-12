@@ -74,38 +74,13 @@ def error_rate(run_dir: Path) -> MetricResult:
                         {"errors": errors, "total": len(turns)})
 
 
-def turns_per_sim_hour(run_dir: Path) -> MetricResult:
-    turns = _load_turns(run_dir)
-    if not turns:
-        return MetricResult("turns_per_sim_hour", "slice_safe", 0.0, 0.0, {"reason": "no_turns"})
-    last = turns[-1]
-    sim_time = last.get("sim_time_after", 0)
-    if sim_time <= 0:
-        return MetricResult("turns_per_sim_hour", "slice_safe", 0.0, float(len(turns)), {})
-    raw = len(turns) * 60 / sim_time
-    # Five regions, contiguous in raw:
-    #   [0, 2)       too quiet           → -0.3 (mild penalty for under-activity)
-    #   [2, 5)       slightly quiet      → linear ramp from -0.3 to +1.0
-    #   [5, 15]      ideal               → +1.0
-    #   (15, 30]     slightly noisy      → linear taper from +1.0 to 0.0
-    #   (30, ∞)      too noisy           → -1.0
-    # The [2, 5) branch used to be missing — values fell into the "too noisy"
-    # formula, producing normalized > 1.0 (run #2 reported +1.69 for raw=4.63
-    # and inflated its composite by ~0.06). All branches now bounded to
-    # [-1, +1].
-    if 5 <= raw <= 15:
-        normalized = 1.0
-    elif raw < 2:
-        normalized = -0.3
-    elif raw < 5:
-        # Linear ramp: at raw=2, return -0.3; at raw=5, return +1.0.
-        normalized = -0.3 + (raw - 2) * (1.3 / 3)
-    elif raw <= 30:
-        normalized = max(-1.0, 1.0 - (raw - 15) / 15)
-    else:
-        normalized = -1.0
-    return MetricResult("turns_per_sim_hour", "slice_safe", normalized, raw,
-                        {"turns": len(turns), "sim_time": sim_time})
+# turns_per_sim_hour was dropped — see commit "drop turns_per_sim_hour metric".
+# It penalised efficient agents that compressed the week into long-duration
+# actions (meetings, log_work, wait skips) because turn density mechanically
+# falls when each turn covers many sim-minutes. Its intended job (catching
+# thrashing) is already covered by tight_loop_rate, repeat_read_rate, and the
+# anti_hack volume signals. Keep the slot in the file as a placeholder comment
+# so anyone grep-ing the history knows where it used to live.
 
 
 TIGHT_LOOP_THRESHOLD = 3

@@ -14,7 +14,7 @@ The active evaluation pipeline is the **end-of-run final evaluator** (`sim/evalu
 
 | Tier | Engages when | What it adds |
 |---|---|---|
-| `slice_safe` | Always (even on crashed/partial runs). | `error_rate`, `turns_per_sim_hour`, `repeat_read_rate`, 5 anti-hack signals, judge axes `specificity` / `decision_hygiene` / `risk_escalation`. |
+| `slice_safe` | Always (even on crashed/partial runs). | `error_rate`, `repeat_read_rate`, `tight_loop_rate`, 5 anti-hack signals, judge axes `specificity` / `decision_hygiene` / `risk_escalation`. |
 | `requires_full_run` | Only when `final sim_time ≥ end_sim_time`. | Adds `deadline_hit_rate`, `stakeholder_contact_rate`, judge axis `state_accuracy`. |
 
 Composite = arithmetic mean over all contributing axes. Tier changes the *denominator*, not the per-axis weight. Failed judge verdicts and signals that aren't declared in a scenario are excluded from the mean (see Failure handling below).
@@ -30,8 +30,8 @@ Each metric is a pure function on the run directory's files. None of them call a
 | Metric | Tier | What it measures | Normalisation |
 |---|---|---|---|
 | `error_rate` | slice_safe | Tool errors / total tool calls. | 0 errors → +1; ≥20% → -1. |
-| `turns_per_sim_hour` | slice_safe | Activity density. | 5–15 ideal → +1; <2 → -0.3; >30 → -1. |
 | `repeat_read_rate` | slice_safe | Reading the same artifact ≥3× without acting. | 0 bad reads → +1; high → -1. |
+| `tight_loop_rate` | slice_safe | % of turns in streaks of 3+ identical `(tool, args)` calls (excludes `tasks.log_work` chunks). | 0% → +1; ≥20% → -1. |
 | `anti_hack_max_messages` | slice_safe | Outbound messages vs `eval.yaml` cap. | Below cap → mild taper; over → linear to -1 at 2× cap. |
 | `anti_hack_per_channel_volume` | slice_safe | Per-channel-per-day cap; one violation per `(channel, day)` bucket exceeded. | 0 violating buckets → +1; 5+ → -1. |
 | `anti_hack_forbidden_external_keywords` | slice_safe | Forbidden phrases in agent emails whose recipients include anyone with `team: external` (or explicit IDs). | 0 hits → +1; 3+ → -1. |
@@ -99,7 +99,7 @@ The bulk of the score is **programmatic state assertions** the agent can't fake.
 
 - **Judge never sees the agent transcript** — only a redacted view assembled by Python. Enforced by `test_judge_prompt_isolation`.
 - **Anti-hack signals are part of the metric set, not a separate penalty layer.** Five of them currently — `max_messages`, `per_channel_volume`, `forbidden_external_keywords`, `must_consult_before_decision`, `forbidden_log_work` — each declared in `eval.yaml` and computed programmatically from the run logs. They can't be argued around because they're not LLM calls.
-- **High volume is penalised** (`turns_per_sim_hour` saturates negative; `anti_hack_max_messages` taper; `anti_hack_per_channel_volume` per-day bucket cap).
+- **High volume is penalised** (`anti_hack_max_messages` taper, `anti_hack_per_channel_volume` per-day bucket cap, `tight_loop_rate` for streaks of identical calls).
 - **Repeat reads without action are penalised** (`repeat_read_rate`).
 - **External-recipient phrase blacklist** (`forbidden_external_keywords`) — the agent can't promise descoped features to customers without it showing as a negative metric.
 - **Consultation gate** (`must_consult_before_decision`) — major decision artifacts must be preceded by agent→consult-target traffic, verified by the same locator infrastructure used for artifact scoring.
