@@ -109,25 +109,34 @@ Each tool validates args, applies ACL/visibility, declares its sim-time cost up 
 The world pushes back through explicit levers:
 
 - **1-minute discrete-event sim clock.** Tool calls advance `sim_time` by declared cost. Real wall-clock inference latency is invisible.
+- **NPCs are LLM-driven characters, not stubs.** Each NPC has its own Sonnet 4.6 brain (`sim/npc/anthropic_brain.py`) seeded from its persona YAML. `sim run` wires this by default when `ANTHROPIC_API_KEY` is set; without the key, it warns and falls back to a stub. The brain is given the NPC's authorized tool schemas so arg names don't get hallucinated.
 - **Business-hours gating with jitter.** NPC actions queued out-of-hours snap to next business open + 0–60 min jitter so the morning isn't a thundering herd.
 - **Per-NPC `responsiveness` multiplier** scales delay distributions (junior eng = 2.5, VP = 0.3).
 - **NPC three-layer split.** LLM brain proposes tool calls → Python runtime applies delay + business hours + hop caps → policy allow-list gates outputs. The brain is content; the runtime is behavior; the policy is authority.
+- **Brain failure visibility.** `NpcRuntime` tracks `brain_failures` / `brain_successes`. The CLI prints both at run exit and warns when >20% of NPC reactions failed (rate limits, parse errors) — silent NPC failure used to look identical to "model chose not to react." It doesn't anymore.
 - **Peer-to-peer hop cap** on `(sender, recipient)` pairs prevents NPC↔NPC chatter cascades.
 - **Task effort gating.** Tasks carry `estimated_effort_seconds`; `tasks.log_work` decrements remaining; `Done` is rejected while remaining > 0.
 - **Meetings auto-generate transcripts** whether the agent attends or not.
 - **Replayable execution.** NPC brain outputs are cached by `(scenario_id, seed, event_id)` so re-running a scenario produces identical NPC behavior.
+- **TPM-shaped briefing.** The agent's briefing includes an ambient **project board** (top 20 P0/P1 not-Done tasks across all assignees) so the TPM doesn't burn turns calling `tasks.list` to recreate a view it would have ambient in a real workplace.
 
-## Evaluation (two layers)
+## Evaluation
 
-1. **Windowed live evaluator** (Haiku 4.5 by default, stubbed in tests). Every 10 agent turns, scores the window on the single principle *"is the agent moving projects forward with minimum noise?"*. The latest verdict feeds the next briefing — the agent can course-correct mid-run.
+The end-of-run final evaluator (Sonnet 4.6 by default) reads the run dir from disk and writes `final_evaluation.json`. `sim grade` auto-wires the real LLM judge when `ANTHROPIC_API_KEY` is set; without it, falls back to a stub and warns loudly.
 
-2. **End-of-run final evaluator** (Sonnet 4.6 by default). Reads the run dir from disk and writes `final_evaluation.json`:
-   - **Programmatic metrics** (in `[-1, +1]`): `error_rate`, `turns_per_sim_hour`, `repeat_read_rate`, `anti_hack_max_messages`, and for completed runs `deadline_hit_rate`, `stakeholder_contact_rate`.
-   - **Judge axes** (in `[-1, +1]`): `specificity`, `decision_hygiene`, `risk_escalation`, and for completed runs `state_accuracy`. The judge sees only a redacted summary — never the agent transcript or self-claims.
-   - **Per-artifact rubrics** judged in isolation against 3–5 yes/no items each. Fold into `decision_hygiene`.
-   - **Composite** = arithmetic mean across all contributing axes (tier changes the denominator, not weights).
+Three layers feed one composite score:
 
-A well-run scenario lands between +0.3 and +0.6. A spammy run lands below -0.20. See `docs/grading.md` for the anti-hack story.
+- **Programmatic metrics** (deterministic, no LLM): `error_rate`, `turns_per_sim_hour`, `repeat_read_rate`, plus **five anti-hack signals**: `max_messages_total`, `max_messages_per_channel_per_day`, `forbidden_keywords_in_external_emails`, `must_consult_before_decision`, `forbidden_log_work`. For completed runs add `deadline_hit_rate` and `stakeholder_contact_rate`.
+- **Judge axes** (`temperature=0`): `specificity`, `decision_hygiene`, `risk_escalation`, and for completed runs `state_accuracy`. The judge sees a redacted payload — agent outbound + inbound chats and emails, tool counts, and the final task board. **Never** the briefing, internal reasoning, or self-narration.
+- **Per-artifact rubrics** judged in isolation: 3–5 yes/no items per artifact, scored on artifact body + ground-truth context only.
+
+**Composite** = arithmetic mean across contributing axes. Scenarios that don't declare a given anti-hack signal report that metric as `contributes=False` so it doesn't drag the score.
+
+**Failure handling**: judge API errors retry with exponential backoff (3 attempts); unrecoverable failures surface as `RubricVerdict.failed=True`, are excluded from the composite, and are listed in `final_evaluation.json.errors[]`. No silent zeros.
+
+A well-run scenario lands between +0.3 and +0.6. A spammy run lands below -0.20. See `docs/grading.md` for the anti-hack story and `docs/architecture.md` for how it fits with the rest of the system.
+
+> **About the windowed evaluator**: code in `sim/evaluator/windowed.py` scores a sliding window of agent turns and feeds the verdict into the next briefing. It's deliberately *unwired* in `sim run`. Giving the agent mid-run feedback would convert this from an evaluation into training — we observe behavior, we don't tutor.
 
 ## Extending
 

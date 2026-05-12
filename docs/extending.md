@@ -77,6 +77,8 @@ def my_metric(run_dir: Path) -> MetricResult:
 
 Wire it into `sim/evaluator/final.py::evaluate_run` by appending to the `metrics` list (in the appropriate tier branch).
 
+**Scenario-specific anti-hack signals**: if your metric only applies when the scenario opts in (declares the signal in `eval.yaml`), return `MetricResult(..., contributes=False, detail={"reason": "signal_not_declared"})` for the no-opt-in path. The metric will still appear in the scorecard for transparency but will be excluded from the composite mean. Pattern after `anti_hack_per_channel_volume` / `anti_hack_forbidden_external_keywords` / `anti_hack_must_consult_before_decision` / `anti_hack_forbidden_log_work` in `metrics.py`.
+
 ## Add a per-artifact rubric
 
 In `eval.yaml`:
@@ -110,7 +112,19 @@ The driver accepts any object with `decide(briefing) -> ToolCall`. For testing, 
 
 ## Swap the judge
 
-`sim/evaluator/judge.py::Judge` is a Protocol with one method. `StubJudge` and `AnthropicJudge` are reference implementations. To plug in a different judge, implement `evaluate(*, system_prompt, user_payload) -> RubricVerdict` and pass it to `evaluate_run(..., judge=YourJudge())`.
+`sim/evaluator/judge.py::Judge` is a Protocol with one method. `StubJudge` and `AnthropicJudge` are reference implementations. To plug in a different judge, implement `evaluate(*, system_prompt, user_payload) -> RubricVerdict` and pass it to `evaluate_run(..., judge=YourJudge())`. To use a different model for the LLM-judged axes, construct `AnthropicJudge(model="claude-opus-4-7")` (or similar) — Opus is a defensible choice when you want the judge to be distinct from the Sonnet-class agent under test.
+
+## Swap the NPC brain
+
+`sim/npc/brain.py::NpcBrain` is the Protocol with one method: `respond(context: NpcBrainContext) -> NpcBrainOutput`. The default `AnthropicNPCBrain` (in `sim/npc/anthropic_brain.py`) uses Sonnet 4.6 with forced tool-use. To plug in a different model, implement `respond` and pass the brain to `build_runtime(scenario, brain=YourBrain())`.
+
+The context carries everything the brain should see:
+- `npc_id`, `persona_role`, `persona_notes`, `knowledge` (from the persona YAML)
+- `trigger_kind` and `trigger_payload` (the message/email/event that woke the NPC)
+- `context_excerpt` (compact relevant world state — recent messages in the triggering channel, etc.)
+- `available_tools` — the NPC's authorized tool schemas, so the brain knows what arg names to use
+
+The output carries `tool_calls` (a list of `ToolCall` — the runtime filters them through `NpcPolicy.allowed_tools` before dispatch), optional `speech` (for meeting turns), and a `rationale` string for debugging. Cache by `(scenario_id, seed, event_id)` is provided automatically by `BrainCache`; deterministic replays are free.
 
 ## Tests
 
