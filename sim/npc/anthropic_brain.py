@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import os
+import time
 from typing import Any
 
 from sim.npc.brain import NpcBrain, NpcBrainContext, NpcBrainOutput
@@ -147,6 +148,8 @@ class AnthropicNPCBrain:
         client: Any | None = None,
         model: str = DEFAULT_MODEL,
         max_tokens: int = 2048,
+        max_attempts: int = 5,
+        backoff_base_seconds: float = 4.0,
     ) -> None:
         if client is None:
             try:
@@ -160,25 +163,44 @@ class AnthropicNPCBrain:
         self._client = client
         self._model = model
         self._max_tokens = max_tokens
+        # Backoff schedule for transient API errors (especially rate limits,
+        # which on Sonnet 4.6 reset on a per-minute window). Default
+        # 4 / 8 / 16 / 32s gives ~60s of total wait — enough to clear one
+        # full rate-limit window without the run silently going NPC-dead.
+        self._max_attempts = max(1, max_attempts)
+        self._backoff_base = backoff_base_seconds
 
     def respond(self, context: NpcBrainContext) -> NpcBrainOutput:
         system_prompt = self._build_system_prompt(context)
         user_message = self._build_user_message(context)
-        try:
-            response = self._client.messages.create(
-                model=self._model,
-                max_tokens=self._max_tokens,
-                temperature=0,
-                system=[{
-                    "type": "text", "text": system_prompt,
-                    "cache_control": {"type": "ephemeral"},
-                }],
-                messages=[{"role": "user", "content": user_message}],
-                tools=[NPC_ACT_TOOL],
-                tool_choice={"type": "tool", "name": "npc_act"},
+        response = None
+        last_exc: Exception | None = None
+        for attempt in range(self._max_attempts):
+            try:
+                response = self._client.messages.create(
+                    model=self._model,
+                    max_tokens=self._max_tokens,
+                    temperature=0,
+                    system=[{
+                        "type": "text", "text": system_prompt,
+                        "cache_control": {"type": "ephemeral"},
+                    }],
+                    messages=[{"role": "user", "content": user_message}],
+                    tools=[NPC_ACT_TOOL],
+                    tool_choice={"type": "tool", "name": "npc_act"},
+                )
+                break
+            except Exception as exc:
+                last_exc = exc
+                if attempt + 1 < self._max_attempts:
+                    time.sleep(self._backoff_base * (2 ** attempt))
+        if response is None:
+            return NpcBrainOutput(
+                rationale=(
+                    f"brain_api_error_after_{self._max_attempts}_attempts: "
+                    f"{last_exc!s}"
+                )[:240],
             )
-        except Exception as exc:
-            return NpcBrainOutput(rationale=f"brain_api_error: {exc!s}"[:240])
 
         for block in response.content:
             if getattr(block, "type", "") != "tool_use":

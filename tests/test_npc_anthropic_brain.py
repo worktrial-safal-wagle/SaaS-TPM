@@ -192,12 +192,45 @@ def test_skips_malformed_tool_call_entries():
 
 
 def test_api_error_returns_silent_output_with_rationale():
+    """API error after exhausted retries returns silent output with marker."""
     client = _StubClient(raise_exc=RuntimeError("simulated 429"))
-    brain = AnthropicNPCBrain(client=client)
+    # max_attempts=1 means no retries — keeps the test fast.
+    brain = AnthropicNPCBrain(client=client, max_attempts=1)
     out = brain.respond(_context())
     assert out.tool_calls == []
     assert out.speech is None
     assert "brain_api_error" in out.rationale
+
+
+def test_api_error_retries_on_transient_failures():
+    """Brain retries on transient errors and succeeds on the second attempt."""
+    class _FlakyMessages:
+        def __init__(self):
+            self.call_count = 0
+
+        def create(self, **kwargs):
+            self.call_count += 1
+            if self.call_count == 1:
+                raise RuntimeError("transient 429")
+            return _make_response({
+                "tool_calls": [{"tool": "chat.dm", "args": {
+                    "recipient_id": "person.tpm", "body": "got it"}}],
+                "rationale": "ack after retry",
+            })
+
+    class _FlakyClient:
+        def __init__(self):
+            self.messages = _FlakyMessages()
+
+    client = _FlakyClient()
+    # Short backoff so the test isn't slow.
+    brain = AnthropicNPCBrain(
+        client=client, max_attempts=3, backoff_base_seconds=0.001,
+    )
+    out = brain.respond(_context())
+    assert client.messages.call_count == 2
+    assert len(out.tool_calls) == 1
+    assert "ack after retry" in out.rationale
 
 
 def test_no_tool_use_block_returns_silent_output():

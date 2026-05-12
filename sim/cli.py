@@ -103,6 +103,24 @@ def _cmd_run(args):
         print(f"Completed {len(turns)} turns; final sim_time={rt.scheduler.sim_time}; run dir: {logger.run_dir}")
     else:
         print(f"Completed {len(turns)} turns; final sim_time={rt.scheduler.sim_time}")
+    # Surface NPC brain health so silent failures (rate limits, parse errors)
+    # don't look like NPCs simply chose not to react. This is operator-facing
+    # diagnostic only — it never feeds back into the agent or eval.
+    if rt.npc_runtime.brain_failures or rt.npc_runtime.brain_successes:
+        total = rt.npc_runtime.brain_failures + rt.npc_runtime.brain_successes
+        rate = rt.npc_runtime.brain_failures / total
+        print(
+            f"NPC brain: {rt.npc_runtime.brain_successes} ok, "
+            f"{rt.npc_runtime.brain_failures} failed ({rate:.0%})",
+            file=sys.stderr,
+        )
+        if rate > 0.2:
+            print(
+                "WARNING: >20% of NPC brain calls failed — NPCs were largely "
+                "silent. Inspect transient API errors (rate limits) and "
+                "consider a smaller --max-turns or higher tier API key.",
+                file=sys.stderr,
+            )
     return 0
 
 

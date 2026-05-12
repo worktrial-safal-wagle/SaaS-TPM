@@ -84,6 +84,14 @@ class NpcRuntime:
         # Drop log — actions silently filtered out, useful for debugging tests.
         self.dropped: list[dict] = []
 
+        # Visibility into NPC brain health. Any brain output whose rationale
+        # is prefixed with `brain_` and has no real content (no tool calls,
+        # no speech) is a failure — API error after retries, missing tool_use
+        # block, etc. Operators need to see this at the end of a run rather
+        # than silently get back the "NPCs were inert" failure mode.
+        self.brain_failures: int = 0
+        self.brain_successes: int = 0
+
         # Wire subscriptions
         world.subscribe("message_inserted", self._on_message_inserted)
 
@@ -222,6 +230,20 @@ class NpcRuntime:
             self.world.scenario_id, self.world.seed, reaction_event_id,
             lambda: self.brain.respond(context),
         )
+
+        # Track brain health: a rationale prefixed with `brain_` and no
+        # actionable output indicates a failed call (rate limit, parse error,
+        # missing tool_use). Surface the count so silent failures don't make
+        # NPCs look like they were just choosing to stay quiet.
+        is_failure = (
+            output.rationale.startswith("brain_")
+            and not output.tool_calls
+            and output.speech is None
+        )
+        if is_failure:
+            self.brain_failures += 1
+        else:
+            self.brain_successes += 1
 
         for call in output.tool_calls:
             if not policy.permits(call.tool):
