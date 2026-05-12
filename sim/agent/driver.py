@@ -93,6 +93,10 @@ class AgentDriver:
                     args_summary=_summarise_args(r.call.args),
                     ok=r.result.ok, error=r.result.error,
                     result_summary=_summarise_result(r.result.result),
+                    # Preserve full content for read tools so the agent doesn't
+                    # re-fetch what it just fetched. Briefing renderer picks the
+                    # last N reads to show full; older reads use the summary.
+                    result_full=_full_result_content(r.call.tool, r.result.result),
                 )
                 for r in self.turns[-10:]
             ]
@@ -153,10 +157,31 @@ def _summarise_args(args: dict) -> str:
     return s if len(s) <= 120 else s[:117] + "..."
 
 
+_READ_TOOLS_FOR_FULL_PRESERVATION = {
+    "chat.read", "email.read", "docs.read", "tasks.get",
+    "calendar.get", "directory.get", "meetings.get_transcript",
+}
+
+
+def _full_result_content(tool: str, result: Any) -> str | None:
+    """Full result body, preserved for read tools so the briefing can present
+    them without re-fetching. Capped at 2000 chars to keep briefing size
+    bounded. Returns None for non-read tools — there's nothing to recall."""
+    if tool not in _READ_TOOLS_FOR_FULL_PRESERVATION or result is None:
+        return None
+    try:
+        s = _json.dumps(result, default=str, indent=2)
+    except Exception:
+        return None
+    return s if len(s) <= 2000 else s[:1997] + "..."
+
+
 def _summarise_result(result: Any) -> str | None:
     """Short, readable summary of a tool result for the recent_actions
-    section of the next briefing. Keep this terse — the agent has the
-    full result in conversational memory if needed.
+    section of the next briefing. Kept terse for tools whose result the
+    agent doesn't need to recall — for read tools we ALSO preserve the
+    full content via `_full_result_content` so the briefing renderer
+    can show whichever is appropriate based on recency.
 
     Truncates at ~300 chars. Highlights key list-count fields when present.
     """

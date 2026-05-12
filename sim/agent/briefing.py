@@ -64,6 +64,12 @@ class BriefingRecentAction(BaseModel):
     ok: bool
     error: str | None = None
     result_summary: str | None = None  # short, truncated repr of the result
+    # For read tools (chat.read, email.read, tasks.get, docs.read, etc.) the
+    # full result body, capped at ~2000 chars. Only the most recent few read
+    # calls have this rendered in the briefing — see render_briefing. Without
+    # it the agent re-reads the same artifact on consecutive turns because
+    # the truncated `result_summary` cuts off message bodies mid-sentence.
+    result_full: str | None = None
 
 
 class Briefing(BaseModel):
@@ -316,12 +322,37 @@ def render_briefing(briefing: Briefing) -> str:
         )
         lines.append("")
     if briefing.recent_actions:
+        # Last 10 actions in reverse (most recent first). For the most recent
+        # 5 *read* tool calls we render the FULL result body (preserved on
+        # BriefingRecentAction.result_full) — without this, agents re-read the
+        # same artifact consecutively because result_summary truncates message
+        # bodies mid-sentence. Older reads + all non-read calls keep the terse
+        # result_summary.
+        READ_TOOLS = {
+            "chat.read", "email.read", "docs.read", "tasks.get",
+            "calendar.get", "directory.get", "meetings.get_transcript",
+        }
+        last_10 = briefing.recent_actions[-10:][::-1]
+        recent_reads_with_full: set[int] = set()
+        read_seen = 0
+        for i, a in enumerate(last_10):
+            if a.tool in READ_TOOLS and a.result_full:
+                if read_seen < 5:
+                    recent_reads_with_full.add(i)
+                read_seen += 1
         lines.append("## Your recent actions + results (most recent first)")
-        lines.append("_You already did these AND have the results below. Do NOT re-read the same artifact — use the result that's already in hand._")
-        for a in briefing.recent_actions[-10:][::-1]:
+        lines.append(
+            "_You already did these AND have the results below. Do NOT re-read "
+            "the same artifact — use the result that's already in hand. Recent "
+            "read results are shown in full; older reads are summarised._"
+        )
+        for i, a in enumerate(last_10):
             ok = "ok" if a.ok else f"ERR: {a.error}"
             lines.append(f"- turn {a.turn} (t={a.sim_time}): `{a.tool}` {a.args_summary} → {ok}")
-            if a.result_summary:
+            if i in recent_reads_with_full:
+                indented = "\n".join("    " + ln for ln in (a.result_full or "").splitlines())
+                lines.append(f"    full result:\n{indented}")
+            elif a.result_summary:
                 lines.append(f"    result: {a.result_summary}")
         lines.append("")
     if briefing.last_verdict:

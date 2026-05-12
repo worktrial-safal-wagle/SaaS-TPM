@@ -293,3 +293,87 @@ def test_project_board_marks_blocked_when_dependency_not_done():
     by_id = {item.task_id: item for item in b.project_board}
     assert by_id["task.DOWNSTREAM"].blocked is True
     assert by_id["task.UPSTREAM"].blocked is False
+
+
+# ---------------------------------------------------------------------------
+# Recent-read full-content preservation (transcript-dive fix)
+# ---------------------------------------------------------------------------
+
+
+def test_briefing_renders_full_result_for_recent_read_calls():
+    """The most recent read calls should have their full result body in the
+    rendered briefing — without it the agent re-reads the same artifact on
+    consecutive turns because result_summary is truncated."""
+    from sim.agent.briefing import (
+        Briefing, BriefingRecentAction, render_briefing,
+    )
+    long_body = "Hey Robin — quick heads-up. The v2.4 migration's been flaky in my dry-runs this weekend (~1 in 5 timeouts under load). Worth a chat with Kai before deploy?"
+    actions = [
+        BriefingRecentAction(
+            turn=0, sim_time=10, tool="chat.read",
+            args_summary='{"channel_id":"dm.maya__tpm"}', ok=True,
+            result_summary="1 messages; sample=[{\"body\": \"Hey Robin — quick heads-up. The v2.4 migration's been flaky...\"}]",
+            result_full=f'{{"messages":[{{"body":"{long_body}"}}]}}'
+        ),
+    ]
+    b = Briefing(
+        now_sim_time=20, now_label="Mon 09:20", end_sim_time=480,
+        agent_persona={"id": "person.tpm", "display_name": "TPM",
+                       "role": "tpm", "persona_notes": "", "team": None},
+        unread_notifications_count=0, unread_chats=[], unread_emails=[],
+        open_commitments=[], project_board=[], upcoming_calendar=[],
+        recent_actions=actions,
+    )
+    md = render_briefing(b)
+    # Full content is present — the agent can see Maya's actual question
+    assert "Worth a chat with Kai before deploy?" in md
+    assert "full result" in md
+
+
+def test_briefing_uses_summary_for_older_reads_beyond_n5():
+    """Only the 5 most recent read calls get the full result. Older reads
+    fall back to the terse summary — guards against unbounded briefing growth
+    and preserves the metric's ability to flag genuinely-distant re-reads."""
+    from sim.agent.briefing import (
+        Briefing, BriefingRecentAction, render_briefing,
+    )
+    # 6 read calls; oldest should not get full content rendered.
+    actions = []
+    for i in range(6):
+        actions.append(BriefingRecentAction(
+            turn=i, sim_time=i * 10, tool="chat.read",
+            args_summary=f'{{"channel_id":"channel.{i}"}}', ok=True,
+            result_summary=f"summary for read {i}",
+            result_full=f"FULL_BODY_FOR_READ_{i}_THIS_IS_VERY_DISTINCTIVE",
+        ))
+    b = Briefing(
+        now_sim_time=100, now_label="Mon 10:40", end_sim_time=480,
+        agent_persona={"id": "person.tpm", "display_name": "TPM",
+                       "role": "tpm", "persona_notes": "", "team": None},
+        unread_notifications_count=0, unread_chats=[], unread_emails=[],
+        open_commitments=[], project_board=[], upcoming_calendar=[],
+        recent_actions=actions,
+    )
+    md = render_briefing(b)
+    # 5 most recent reads (turns 1..5) have full content
+    for i in range(1, 6):
+        assert f"FULL_BODY_FOR_READ_{i}_THIS_IS_VERY_DISTINCTIVE" in md, f"read {i} should have full content"
+    # The oldest read (turn 0) does NOT have full content rendered
+    assert "FULL_BODY_FOR_READ_0_THIS_IS_VERY_DISTINCTIVE" not in md
+    # ... but its terse summary IS rendered
+    assert "summary for read 0" in md
+
+
+def test_driver_populates_result_full_only_for_read_tools():
+    """Driver should set result_full on read-tool turns and leave it None on
+    write-tool turns (no body to recall)."""
+    from sim.agent.driver import _full_result_content
+    # Read tool with content
+    chat_result = {"messages": [{"body": "hello", "sender_id": "person.maya"}]}
+    full = _full_result_content("chat.read", chat_result)
+    assert full is not None
+    assert "hello" in full
+    # Write tool — no need to recall
+    send_result = {"message_id": "msg.123", "ok": True}
+    full = _full_result_content("chat.send", send_result)
+    assert full is None
