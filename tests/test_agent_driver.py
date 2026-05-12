@@ -377,3 +377,43 @@ def test_driver_populates_result_full_only_for_read_tools():
     send_result = {"message_id": "msg.123", "ok": True}
     full = _full_result_content("chat.send", send_result)
     assert full is None
+
+
+# ---------------------------------------------------------------------------
+# Failure-cost: failed tool calls advance sim_time (prevent infinite loops)
+# ---------------------------------------------------------------------------
+
+
+def test_failed_tool_call_advances_sim_time():
+    """Failed tool calls cost 1 sim-minute so the scheduler eventually
+    advances past end_sim_time even if the agent loops on a broken call."""
+    from sim.tools import ToolCall
+    s = load_scenario(SMOKE)
+    rt = build_runtime(s)
+    start = rt.scheduler.sim_time
+    # Unknown tool — fails on the first dispatch path
+    result = rt.agent_registry.dispatch(ToolCall(tool="bogus.tool", args={}))
+    assert result.ok is False
+    assert result.cost_minutes == 1
+    assert rt.scheduler.sim_time == start + 1
+
+
+def test_repeated_failed_calls_eventually_cross_end_sim_time():
+    """The agent loop terminates against end_sim_time even when the agent
+    keeps calling a failing tool — this was the infinite-loop bug."""
+    from sim.tools import ToolCall
+    s = load_scenario(SMOKE)
+    rt = build_runtime(s)
+    assembler = BriefingAssembler(rt.world, end_sim_time=10)
+    # Agent keeps calling an unknown tool. With cost=1 on failure, sim_time
+    # crosses 10 in <= 11 turns.
+    agent = ScriptedAgent([], default=ToolCall(tool="bogus.tool", args={}))
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=100, end_sim_time=10),
+    )
+    turns = driver.run()
+    # Loop should terminate around turn 10-11 (each failed call advances
+    # sim_time by 1), well before the max_turns=100 cap.
+    assert len(turns) <= 12, f"expected <= 12 turns, got {len(turns)}"
+    assert rt.scheduler.sim_time >= 10

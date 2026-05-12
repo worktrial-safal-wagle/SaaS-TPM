@@ -541,6 +541,119 @@ def test_turns_per_sim_hour_boundary_points_within_range(tmp_path):
     assert turns_per_sim_hour(rd).normalized == -1.0
 
 
+def _write_turns_from_list(tmp_path, turn_dicts: list[dict]):
+    """Helper: write a turns.jsonl from a list of turn dicts."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    (tmp_path / "turns.jsonl").write_text(
+        "\n".join(json.dumps(t) for t in turn_dicts)
+    )
+    return tmp_path
+
+
+def _failed_turn(i, tool, args):
+    return {"turn": i, "tool": tool, "args": args, "ok": False,
+            "sim_time_before": i, "sim_time_after": i + 1, "error": "x"}
+
+
+def _ok_turn(i, tool, args):
+    return {"turn": i, "tool": tool, "args": args, "ok": True,
+            "sim_time_before": i, "sim_time_after": i + 1}
+
+
+def test_tight_loop_rate_clean_run(tmp_path):
+    """Varied tool calls — no tight loops, score +1.0."""
+    from sim.evaluator.metrics import tight_loop_rate
+    # Different tool each turn = no consecutive same-key streak.
+    tools = ["tasks.list", "chat.read", "tasks.get", "email.read",
+             "chat.send", "tasks.update_status", "email.send", "docs.read",
+             "tasks.log_work", "chat.list"]
+    turns = [_ok_turn(i, t, {"i": i}) for i, t in enumerate(tools)]
+    rd = _write_turns_from_list(tmp_path, turns)
+    result = tight_loop_rate(rd)
+    assert result.normalized == 1.0
+    assert result.raw == 0.0
+
+
+def test_tight_loop_rate_catches_successful_spam(tmp_path):
+    """100 identical successful chat.send calls is a tight loop too — the
+    agent isn't varying its behaviour. This is the spam pattern that the
+    `golden_low_score` test was originally meant to penalise."""
+    from sim.evaluator.metrics import tight_loop_rate
+    turns = [
+        _ok_turn(i, "chat.send",
+                 {"channel_id": "channel.general", "body": "spam"})
+        for i in range(20)
+    ]
+    rd = _write_turns_from_list(tmp_path, turns)
+    result = tight_loop_rate(rd)
+    assert result.raw == 1.0  # all 20 turns in the loop
+    assert result.normalized == -1.0
+
+
+def test_tight_loop_rate_detects_5_failure_streak(tmp_path):
+    """5 consecutive identical failed calls = loop of 5; 5/10 = 0.5 raw."""
+    from sim.evaluator.metrics import tight_loop_rate
+    # Varied warmup (each turn a different (tool, args) so no loop).
+    turns = [
+        _ok_turn(0, "tasks.list", {}),
+        _ok_turn(1, "chat.read", {"channel_id": "x"}),
+        _ok_turn(2, "tasks.get", {"task_id": "t.1"}),
+        _ok_turn(3, "email.read", {"thread_id": "th.1"}),
+        _ok_turn(4, "docs.read", {"doc_id": "d.1"}),
+    ]
+    # 5 failed identical calls (the loop)
+    for i in range(5, 10):
+        turns.append(_failed_turn(i, "meetings.attend", {"event_id": "cal.x"}))
+    rd = _write_turns_from_list(tmp_path, turns)
+    result = tight_loop_rate(rd)
+    assert result.raw == 0.5
+    assert result.normalized == -1.0  # 0.5 / 0.2 = 2.5, clamped
+    assert result.detail["loop_turns"] == 5
+    assert result.detail["longest_loop"]["length"] == 5
+    assert result.detail["longest_loop"]["tool"] == "meetings.attend"
+
+
+def test_tight_loop_rate_threshold_below_3_does_not_count(tmp_path):
+    """2 consecutive identical failures is not a loop."""
+    from sim.evaluator.metrics import tight_loop_rate
+    turns = [_ok_turn(0, "x", {})]
+    turns.append(_failed_turn(1, "meetings.attend", {"event_id": "cal.x"}))
+    turns.append(_failed_turn(2, "meetings.attend", {"event_id": "cal.x"}))
+    # 2 consecutive failures — below threshold of 3
+    rd = _write_turns_from_list(tmp_path, turns)
+    result = tight_loop_rate(rd)
+    assert result.raw == 0.0
+
+
+def test_tight_loop_rate_success_breaks_streak(tmp_path):
+    """3 fails, 1 success, 3 fails = two separate 3-fail streaks (both counted)."""
+    from sim.evaluator.metrics import tight_loop_rate
+    turns = []
+    for i in range(3):
+        turns.append(_failed_turn(i, "meetings.attend", {"event_id": "cal.x"}))
+    turns.append(_ok_turn(3, "tasks.list", {}))
+    for i in range(4, 7):
+        turns.append(_failed_turn(i, "meetings.attend", {"event_id": "cal.x"}))
+    rd = _write_turns_from_list(tmp_path, turns)
+    result = tight_loop_rate(rd)
+    # 3 + 3 = 6 loop turns; total = 7
+    assert result.detail["loop_turns"] == 6
+
+
+def test_tight_loop_rate_different_args_do_not_form_loop(tmp_path):
+    """Same tool but different args is not a tight loop."""
+    from sim.evaluator.metrics import tight_loop_rate
+    turns = [
+        _failed_turn(0, "meetings.attend", {"event_id": "cal.a"}),
+        _failed_turn(1, "meetings.attend", {"event_id": "cal.b"}),
+        _failed_turn(2, "meetings.attend", {"event_id": "cal.c"}),
+    ]
+    rd = _write_turns_from_list(tmp_path, turns)
+    result = tight_loop_rate(rd)
+    # Each fails individually with different args — no streak ≥ 3
+    assert result.raw == 0.0
+
+
 def test_anti_hack_signals_not_declared_do_not_contribute(tmp_path):
     """No signal in eval.yaml → metric is reported but excluded from composite."""
     from sim.evaluator.metrics import (

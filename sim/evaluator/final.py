@@ -38,6 +38,7 @@ from sim.evaluator.metrics import (
     error_rate,
     repeat_read_rate,
     stakeholder_contact_rate,
+    tight_loop_rate,
     turns_per_sim_hour,
 )
 from sim.evaluator.rubrics import ArtifactScore, score_artifact
@@ -154,6 +155,7 @@ def evaluate_run(run_dir: str | Path, *, judge: Judge | None = None) -> FinalEva
         error_rate(run_dir),
         turns_per_sim_hour(run_dir),
         repeat_read_rate(run_dir),
+        tight_loop_rate(run_dir),
         anti_hack_max_messages(run_dir, eval_truth),
         anti_hack_per_channel_volume(run_dir, eval_truth),
         anti_hack_forbidden_external_keywords(run_dir, eval_truth),

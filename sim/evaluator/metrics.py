@@ -108,6 +108,81 @@ def turns_per_sim_hour(run_dir: Path) -> MetricResult:
                         {"turns": len(turns), "sim_time": sim_time})
 
 
+TIGHT_LOOP_THRESHOLD = 3
+
+
+def tight_loop_rate(run_dir: Path) -> MetricResult:
+    """Flag agents that get stuck calling the same tool with the same args.
+
+    A "tight loop" is 3+ consecutive turns with identical (tool, args) —
+    regardless of success/failure. Two failure modes this catches:
+
+      - Failed loops: the agent keeps retrying a broken call (e.g., 136
+        consecutive failed meetings.attend on an already-ended meeting).
+      - Successful spam: the agent keeps emitting the same write call
+        (e.g., 100 consecutive chat.send with identical body).
+
+    Whether each call succeeds doesn't matter — the pattern is "agent isn't
+    varying its behaviour, isn't making progress." Failed loops already cost
+    sim-time so they self-terminate; this metric ensures they also show up
+    on the scorecard rather than being silently absorbed by the (saturated)
+    error_rate metric. Successful spam is already partly caught by
+    anti_hack_max_messages but only for the specific case of chat volume.
+
+    Total loop-turns / total turns. 0% → +1; ≥20% → -1.
+    """
+    turns = _load_turns(run_dir)
+    if not turns:
+        return MetricResult("tight_loop_rate", "slice_safe", 1.0, 0.0,
+                            {"reason": "no_turns"})
+
+    def args_sig(args: Any) -> str:
+        try:
+            return json.dumps(args or {}, sort_keys=True, default=str)
+        except Exception:
+            return str(args)
+
+    loop_turns = 0
+    longest_loop = 0
+    longest_loop_key: tuple[str, str] | None = None
+    current_key: tuple[str, str] | None = None
+    current_count = 0
+
+    for t in turns:
+        key = (t.get("tool", ""), args_sig(t.get("args")))
+        if key == current_key:
+            current_count += 1
+        else:
+            if current_count >= TIGHT_LOOP_THRESHOLD:
+                loop_turns += current_count
+                if current_count > longest_loop:
+                    longest_loop = current_count
+                    longest_loop_key = current_key
+            current_key = key
+            current_count = 1
+    if current_count >= TIGHT_LOOP_THRESHOLD:
+        loop_turns += current_count
+        if current_count > longest_loop:
+            longest_loop = current_count
+            longest_loop_key = current_key
+
+    raw = loop_turns / len(turns)
+    # 0% loop turns → +1.0; 20% → 0.0; 40%+ → -1.0.
+    normalized = max(-1.0, min(1.0, 1.0 - raw / 0.2))
+    detail: dict[str, Any] = {
+        "loop_turns": loop_turns,
+        "total_turns": len(turns),
+        "threshold": TIGHT_LOOP_THRESHOLD,
+    }
+    if longest_loop_key is not None:
+        detail["longest_loop"] = {
+            "tool": longest_loop_key[0],
+            "args_sig": longest_loop_key[1][:160],
+            "length": longest_loop,
+        }
+    return MetricResult("tight_loop_rate", "slice_safe", normalized, raw, detail)
+
+
 def repeat_read_rate(run_dir: Path) -> MetricResult:
     """Penalize reading the same artifact ≥3× without acting between reads."""
     turns = _load_turns(run_dir)

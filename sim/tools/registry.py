@@ -26,6 +26,15 @@ from sim.store.entities import Notification
 from sim.tools.base import ToolCall, ToolOp, ToolResult, from_sdk_name
 
 
+# Failed tool calls still cost real time — a TPM that walks into a room for
+# a meeting that already ended burns a minute discovering it. Without this,
+# the scheduler doesn't advance on failure and the agent loop can get stuck
+# calling the same broken tool forever (the in-flight run wasted 136 of 250
+# turns this way before the budget ran out). 1 sim-minute is enough to
+# guarantee tight loops eventually terminate against end_sim_time.
+FAILURE_COST_MINUTES = 1
+
+
 class ToolRegistry:
     def __init__(self, world: World, scheduler: Scheduler, caller_id: str) -> None:
         self.world = world
@@ -71,43 +80,42 @@ class ToolRegistry:
     # Dispatch
     # ------------------------------------------------------------------
 
+    def _failure(self, call: ToolCall, error: str) -> ToolResult:
+        """Build a failed ToolResult and advance sim_time by FAILURE_COST_MINUTES.
+
+        Charging real time on failure is what makes the scheduler-based design
+        safe against agents that loop on a broken call. With cost=0 on failure
+        the agent could call the same failing tool indefinitely; with cost=1
+        the scheduler eventually crosses end_sim_time and the run terminates.
+        """
+        self.scheduler.advance(FAILURE_COST_MINUTES)
+        return ToolResult(
+            ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
+            cost_minutes=FAILURE_COST_MINUTES, error=error,
+        )
+
     def dispatch(self, call: ToolCall) -> ToolResult:
         op = self._ops.get(call.tool) or self._ops.get(from_sdk_name(call.tool))
         if op is None:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=f"unknown tool: {call.tool}",
-            )
+            return self._failure(call, f"unknown tool: {call.tool}")
 
         try:
             args = op.args_model.model_validate(call.args)
         except ValidationError as e:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=f"invalid args: {e.errors()[0]['msg']}",
-            )
+            return self._failure(call, f"invalid args: {e.errors()[0]['msg']}")
 
         try:
             declared_cost = op.cost_for(args)
         except Exception as e:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=f"cost computation failed: {e}",
-            )
+            return self._failure(call, f"cost computation failed: {e}")
 
         start_sim_time = self.scheduler.sim_time
         try:
             result = op.handler(self.world, self.scheduler, args, self.caller_id)
         except ToolError as e:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=str(e),
-            )
+            return self._failure(call, str(e))
         except Exception as e:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=f"handler error: {e}",
-            )
+            return self._failure(call, f"handler error: {e}")
 
         # Most tools have a declared cost > 0 and don't touch the scheduler
         # themselves; we advance now. `wait.*` handlers advance the scheduler
