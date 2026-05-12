@@ -83,11 +83,23 @@ def turns_per_sim_hour(run_dir: Path) -> MetricResult:
     if sim_time <= 0:
         return MetricResult("turns_per_sim_hour", "slice_safe", 0.0, float(len(turns)), {})
     raw = len(turns) * 60 / sim_time
-    # 5-15 turns/sim-hour ideal → +1. 30+ → -1. <2 → -0.3 (too quiet).
+    # Five regions, contiguous in raw:
+    #   [0, 2)       too quiet           → -0.3 (mild penalty for under-activity)
+    #   [2, 5)       slightly quiet      → linear ramp from -0.3 to +1.0
+    #   [5, 15]      ideal               → +1.0
+    #   (15, 30]     slightly noisy      → linear taper from +1.0 to 0.0
+    #   (30, ∞)      too noisy           → -1.0
+    # The [2, 5) branch used to be missing — values fell into the "too noisy"
+    # formula, producing normalized > 1.0 (run #2 reported +1.69 for raw=4.63
+    # and inflated its composite by ~0.06). All branches now bounded to
+    # [-1, +1].
     if 5 <= raw <= 15:
         normalized = 1.0
     elif raw < 2:
         normalized = -0.3
+    elif raw < 5:
+        # Linear ramp: at raw=2, return -0.3; at raw=5, return +1.0.
+        normalized = -0.3 + (raw - 2) * (1.3 / 3)
     elif raw <= 30:
         normalized = max(-1.0, 1.0 - (raw - 15) / 15)
     else:

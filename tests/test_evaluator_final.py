@@ -484,6 +484,63 @@ def test_anti_hack_forbidden_log_work_ok_on_own_task(tmp_path):
     assert result.normalized == 1.0
 
 
+def _write_turns_for_density(tmp_path, num_turns: int, sim_time_after: int):
+    """Tiny helper for turns_per_sim_hour tests — only `sim_time_after` on the
+    last turn matters for the metric. Creates the directory if missing."""
+    tmp_path.mkdir(parents=True, exist_ok=True)
+    lines = []
+    for i in range(num_turns):
+        lines.append(json.dumps({
+            "turn": i, "tool": "wait.until", "args": {},
+            "ok": True,
+            "sim_time_before": sim_time_after - 1 if i == num_turns - 1 else 0,
+            "sim_time_after": sim_time_after if i == num_turns - 1 else 0,
+        }))
+    (tmp_path / "turns.jsonl").write_text("\n".join(lines))
+    return tmp_path
+
+
+def test_turns_per_sim_hour_clamps_in_slightly_quiet_region(tmp_path):
+    """[2, 5) used to fall through to the >15 formula and produce values > 1.0
+    (run #2 reported +1.69 for raw=4.63). Now properly bounded to [-1, +1]."""
+    from sim.evaluator.metrics import turns_per_sim_hour
+    # raw = 250 * 60 / 2940 ≈ 5.10 — should clamp at +1.0 (just barely in ideal)
+    rd = _write_turns_for_density(tmp_path, 250, 2940)
+    result = turns_per_sim_hour(rd)
+    assert result.normalized == 1.0
+    assert -1.0 <= result.normalized <= 1.0
+
+
+def test_turns_per_sim_hour_ramp_at_intermediate_density(tmp_path):
+    """raw=4 should land halfway through the linear ramp from -0.3 to +1.0."""
+    from sim.evaluator.metrics import turns_per_sim_hour
+    # 4 turns * 60 / 60 = raw 4.0 → -0.3 + (4-2) * 1.3/3 = -0.3 + 0.867 = 0.567
+    rd = _write_turns_for_density(tmp_path, 4, 60)
+    result = turns_per_sim_hour(rd)
+    assert abs(result.normalized - 0.567) < 0.01
+    assert -1.0 <= result.normalized <= 1.0
+
+
+def test_turns_per_sim_hour_boundary_points_within_range(tmp_path):
+    """All branches return values in [-1, +1]."""
+    from sim.evaluator.metrics import turns_per_sim_hour
+    # Below 2: raw=1, returns -0.3
+    rd = _write_turns_for_density(tmp_path / "a", 1, 60)
+    assert turns_per_sim_hour(rd).normalized == -0.3
+    # Boundary: raw=5, returns +1.0
+    rd = _write_turns_for_density(tmp_path / "b", 5, 60)
+    assert turns_per_sim_hour(rd).normalized == 1.0
+    # Boundary: raw=15, returns +1.0
+    rd = _write_turns_for_density(tmp_path / "c", 15, 60)
+    assert turns_per_sim_hour(rd).normalized == 1.0
+    # Slightly noisy: raw=22, returns 1.0 - (22-15)/15 ≈ 0.533
+    rd = _write_turns_for_density(tmp_path / "d", 22, 60)
+    assert abs(turns_per_sim_hour(rd).normalized - 0.533) < 0.01
+    # Too noisy: raw=40, returns -1.0
+    rd = _write_turns_for_density(tmp_path / "e", 40, 60)
+    assert turns_per_sim_hour(rd).normalized == -1.0
+
+
 def test_anti_hack_signals_not_declared_do_not_contribute(tmp_path):
     """No signal in eval.yaml → metric is reported but excluded from composite."""
     from sim.evaluator.metrics import (
