@@ -264,3 +264,70 @@ def test_default_construction_requires_anthropic_api_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     with pytest.raises(RuntimeError, match="ANTHROPIC_API_KEY"):
         AnthropicNPCBrain()
+
+
+# ---------------------------------------------------------------------------
+# Tick-poll path: render the accumulated triggers list to the brain
+# ---------------------------------------------------------------------------
+
+
+def test_user_message_renders_accumulated_triggers_inbox():
+    """When the runtime supplies multiple triggers (tick-poll), the user
+    prompt switches to the inbox template and renders all of them in
+    most-recent-first order."""
+    from sim.npc.brain import NpcTrigger
+
+    triggers = [
+        NpcTrigger(
+            kind="message_inserted",
+            payload={"message_id": "msg.3", "channel_id": "channel.eng",
+                     "sender_id": "person.tpm", "body": "freshest ping"},
+            sim_time=20,
+        ),
+        NpcTrigger(
+            kind="message_inserted",
+            payload={"message_id": "msg.2", "channel_id": "channel.eng",
+                     "sender_id": "person.dani", "body": "older ping"},
+            sim_time=10,
+        ),
+    ]
+    client = _StubClient(response=_make_response({
+        "tool_calls": [], "rationale": "ack", "speech": None,
+    }))
+    brain = AnthropicNPCBrain(client=client)
+    ctx = NpcBrainContext(
+        npc_id="person.kai",
+        persona_role="Senior Backend Engineer",
+        triggers=triggers,
+        context_excerpt="(no prior messages)",
+    )
+    brain.respond(ctx)
+    user_text = client.messages.last_kwargs["messages"][0]["content"]
+    # The poll prompt header should be present.
+    assert "TICK POLL" in user_text
+    assert "INBOX" in user_text
+    # Both triggers should be in the rendered inbox.
+    assert "freshest ping" in user_text
+    assert "older ping" in user_text
+    # Most-recent first: "freshest ping" comes before "older ping".
+    assert user_text.index("freshest ping") < user_text.index("older ping")
+
+
+def test_user_message_uses_legacy_template_for_meeting_turn():
+    """Meeting-turn invocations populate the single-trigger fields and leave
+    `triggers` empty; the brain falls back to the legacy template."""
+    client = _StubClient(response=_make_response({
+        "tool_calls": [], "rationale": "ack", "speech": "I'll prep notes.",
+    }))
+    brain = AnthropicNPCBrain(client=client)
+    ctx = NpcBrainContext(
+        npc_id="person.kai",
+        persona_role="Senior Backend Engineer",
+        trigger_kind="meeting_turn",
+        trigger_payload={"event_id": "cal.standup", "agenda": "standup"},
+        context_excerpt="standup",
+    )
+    brain.respond(ctx)
+    user_text = client.messages.last_kwargs["messages"][0]["content"]
+    assert "TRIGGER KIND: meeting_turn" in user_text
+    assert "TICK POLL" not in user_text

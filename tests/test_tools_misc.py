@@ -96,7 +96,8 @@ def test_all_ops_bundle_has_expected_tools():
         "meetings.attend", "meetings.get_transcript",
         "directory.list", "directory.get",
         "notifications.list", "notifications.mark_read",
-        "wait.until", "wait.for_next_event",
+        "wait.until",
+        "idle.until", "abandon.current",
     ]:
         assert required in names, f"missing tool: {required}"
 

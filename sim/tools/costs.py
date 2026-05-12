@@ -67,6 +67,7 @@ COST_DOC_COMMENT = 2
 # Directory / notifications
 COST_DIR_LIST = 1
 COST_DIR_GET = 1
+COST_DIR_PRESENCE = 1  # peek at someone's busy state — same as a directory lookup
 COST_NOTIF_LIST = 1
 COST_NOTIF_MARK_READ = 0   # one click
 

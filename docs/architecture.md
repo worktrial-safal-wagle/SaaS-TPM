@@ -14,65 +14,103 @@ This doc walks the lifecycle of a single agent turn from `sim run` to scorecard.
 | NPC brain (LLM) | `sim/npc/anthropic_brain.py` | Sonnet 4.6 via forced tool-use; persona + knowledge + per-NPC tool schemas; retries with backoff; silent on failure. Wired by default when `ANTHROPIC_API_KEY` is set. |
 | Meeting transcripts | `sim/npc/meetings.py` + `sim/tools/meetings.py` | Same brain cache for synthesized + attended. |
 | Scenario loader + lint | `sim/scenario/` | YAML → hydrated `World` + scheduled events. Pure data. |
-| Agent driver | `sim/agent/driver.py` | Perceive-decide-act loop; one tool per turn. |
-| Briefing | `sim/agent/briefing.py` | Structured pydantic → markdown for the LLM. Includes an ambient **project board** (top P0/P1 not-Done tasks across all assignees) so the TPM agent doesn't have to spend turns recreating it via `tasks.list`. |
+| Agent driver | `sim/agent/driver.py` | Tick-driven loop: agent polled every `tick_size_minutes` (default 15) with a delta briefing. Opt-in continuation chains up to 4 decisions per tick. |
+| Briefing | `sim/agent/briefing.py` | Structured pydantic → markdown for the LLM. Tick 1 is a full briefing; subsequent ticks are **deltas** (`build_delta_briefing(since)`) — only what changed since last poll. Includes an ambient **project board** (top P0/P1 not-Done tasks across all assignees). |
 | Reference agent | `sim/agent/reference_agent.py` | Anthropic SDK + forced tool-use. |
 | Run logger | `sim/logging/run_logger.py` | JSONL streams + content-addressed artifacts. |
 | Windowed evaluator | `sim/evaluator/windowed.py` | Per-window judge with feedback into briefing. **Deliberately unwired** in `sim run` — see `docs/grading.md`. |
 | Final evaluator | `sim/evaluator/final.py` | Reads run dir; programmatic metrics + LLM judge axes + per-artifact rubrics. `sim grade` auto-wires the real LLM judge when `ANTHROPIC_API_KEY` is set. |
 | Runtime assembly | `sim/runtime.py` | Wires it all together from a loaded scenario. |
 
-## Lifecycle of a single turn
+## Lifecycle of a single tick
 
 ```
-                           ┌──────────────────────────┐
-   agent runs              │  AgentDriver.run()       │
-                           └──────────┬───────────────┘
-                                      │ per turn:
-                  ┌───────────────────┴──────────────────┐
-                  │  BriefingAssembler.build(now, last)  │
-                  └───────────────────┬──────────────────┘
-                                      │ Briefing pydantic
-                                      ▼
-                           ┌──────────────────────────┐
-                           │  Agent.decide(briefing)  │
-                           │  (LLM or scripted)       │
-                           └──────────┬───────────────┘
-                                      │ ToolCall
-                                      ▼
-                           ┌──────────────────────────┐
-                           │  ToolRegistry.dispatch   │
-                           │   1. validate args       │
-                           │   2. ACL check           │
-                           │   3. handler mutates     │
-                           │   4. advance scheduler   │
-                           │      by declared cost    │
-                           │   5. drain pending evts  │
-                           │   6. collect new notifs  │
-                           └──────────┬───────────────┘
-                                      │ ToolResult
-                                      ▼
-                            (turn_observer → RunLogger,
-                             feedback_provider ← WindowedEvaluator)
+                           ┌──────────────────────────────┐
+   agent runs              │  AgentDriver.run()           │
+                           └──────────────┬───────────────┘
+                                          │ loop:
+                  ┌───────────────────────┴──────────────────────┐
+                  │ scheduler.advance_to(next actor_poll for me) │
+                  │ (drains NPC reactions, calendar starts, etc. │
+                  │  along the way)                              │
+                  └───────────────────────┬──────────────────────┘
+                                          │ tick starts
+                                          ▼
+                  ┌───────────────────────────────────────────────┐
+                  │  build_delta_briefing(actor, since=last_poll) │
+                  │  (full briefing on tick 1)                    │
+                  └───────────────────────┬──────────────────────┘
+                                          │ Briefing
+                                          ▼
+                  ┌──────────────────────────┐
+                  │  Agent.decide(briefing)  │   loop up to 4 times
+                  │  (LLM or scripted)       │   if call.continue_in_tick
+                  └──────────┬───────────────┘
+                             │ ToolCall
+                             ▼
+                  ┌──────────────────────────┐
+                  │  ToolRegistry.dispatch   │
+                  │   1. validate args       │
+                  │   2. ACL check           │
+                  │   3. handler mutates     │
+                  │   4. advance scheduler   │
+                  │      by declared cost    │
+                  │      (or full cost on    │
+                  │      failure — failure   │
+                  │      loops surface in    │
+                  │      budget)             │
+                  │   5. drain pending evts  │
+                  │   6. collect new notifs  │
+                  └──────────┬───────────────┘
+                             │ ToolResult
+                             ▼
+              ┌──────────────────────────────────────────┐
+              │  tick ends                               │
+              │  schedule_actor_poll for this actor at   │
+              │    max(now + tick_size, busy_until)      │
+              │  (personal cadence — no global grid)     │
+              └──────────────────────────────────────────┘
+                             │
+                             ▼
+                  (turn_observer → RunLogger,
+                   feedback_provider ← WindowedEvaluator [unwired])
 ```
+
+Special tools that interact with the tick loop:
+
+- `idle.until(target_sim_time)` — pushes `next_poll_at` to a later tick. Cap of 120 sim-min. Urgent inbound auto-interrupts.
+- `abandon.current` — when polled mid-long-action, agent can release `busy_until` early for a 2-min transition cost.
 
 ### Time advance during step (4)
 
 When the registry advances the scheduler by `cost`, the event queue drains every event with `fire_at ≤ new sim_time`. Those events can be:
 
 - pre-scheduled scenario events (e.g. Tuesday 10:00 customer escalation email)
-- hourly `agent_heartbeat` markers (for `wait.for_next_event`)
-- queued NPC reactions that became due during the advance
+- hourly `agent_heartbeat` markers
+- per-actor `actor_poll` events (tick-based polling cadence)
+- `calendar_event_start` markers (NPC runtime uses these to set `busy_until` on attendees)
 
 Each fired event may mutate the world and schedule further events. Order is `(fire_at, event_id)` — fully deterministic.
 
-### Why a separate `wait.for_next_event`
+### Tick-based actor polling
 
-The agent shouldn't have to guess sim-time skips between actions. `wait.for_next_event` peeks the scheduler for the earliest event whose `kind` is in `AGENT_VISIBLE_EVENT_KINDS` (`chat_to_agent`, `email_to_agent`, `calendar_event_start`, `agent_heartbeat`) and advances to it.
+The agent and each NPC have a **personal tick cadence** (default 15 sim-min, scenario-configurable via `tick_size_minutes`). At each tick the actor is polled — given a delta briefing (or accumulated triggers, for NPCs) — and decides one or more actions.
 
-### NPC perception lag
+Agents can opt in to chain multiple decisions within a tick by setting `continue_in_tick=True` on a `ToolCall` (cap of 4 decisions per tick). They can also call `idle.until(target_sim_time)` to defer their next poll to a later time (cap 120 sim-min).
 
-`NpcRuntime` adds a 1-minute "perception lag" to every NPC reaction, on top of the sampled delay. This ensures the NPC's reply lands *after* the triggering agent's tool dispatch returns, not inside it. Without this, a single agent tool call could cascade through several NPC reactions before the agent regained control, which is unrealistic and made cost accounting noisy.
+There's no `wait.for_next_event` tool anymore — the tick cadence itself replaces it. NPCs naturally drop balls when overloaded because each NPC tick processes one trigger from their queue; remaining triggers wait for the next tick.
+
+### NPC tick model
+
+Each NPC has its own `next_poll_at` and `busy_until` (on `Person`). When their `actor_poll` event fires, the runtime:
+
+1. Skips the brain call entirely if the trigger queue is empty (perf optimization — quiet NPCs poll cheaply).
+2. Otherwise builds an `NpcBrainContext` carrying the accumulated triggers (DMs, mentions, emails since last poll, most-recent-first).
+3. Invokes the brain to decide one action — NPCs do not get opt-in continuation (single decision per tick).
+4. If a tool call was dispatched, consumes the head trigger; remaining triggers stay queued for next tick.
+5. Reschedules the next poll at `max(now + tick_size, busy_until)`.
+
+NPCs in scheduled meetings have their `busy_until` set when the calendar event fires; their next poll naturally lands after the meeting. NPCs that are *overloaded* (many queued triggers, limited tick budget) naturally drop balls — which is realistic and a real signal the eval can pick up via `follow_up_rate`.
 
 ### NPC brain wiring + visibility
 
@@ -80,7 +118,7 @@ The agent shouldn't have to guess sim-time skips between actions. `wait.for_next
 
 The brain receives the NPC's authorized **tool schemas** in its `NpcBrainContext.available_tools` — without these, the model would hallucinate parameter names (e.g., `to_user_id` instead of `recipient_id`) and every NPC dispatch would fail validation. The runtime extracts schemas from the NPC's filtered tool registry, so only the policy's allowed tools are visible to the brain.
 
-Brain calls have **retries with exponential backoff** (5 attempts, 4s base → ~60s total wait) so transient rate limits don't silently turn NPCs into stubs for the rest of the run. `NpcRuntime` tracks `brain_failures` and `brain_successes` counters; `sim run` prints them at exit and warns when failure rate exceeds 20%. A run where 50% of NPC reactions silently API-erred used to be invisible — now it's loud.
+Brain calls have **retries with exponential backoff** (5 attempts, 4s base → ~60s total wait) so transient rate limits don't silently turn NPCs into stubs for the rest of the run. `NpcRuntime` tracks `brain_failures`, `brain_successes`, and `empty_queue_skips` counters; `sim run` prints them at exit and warns when failure rate exceeds 20%.
 
 ## Determinism
 

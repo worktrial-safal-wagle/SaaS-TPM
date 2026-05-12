@@ -95,6 +95,25 @@ RELEVANT CONTEXT FROM YOUR VIEW OF THE WORLD:
 """
 
 
+# Tick-poll variant: the brain sees a queue of triggers accumulated since
+# the NPC's last poll, ordered most-recent-first. The brain decides ONE
+# action — typically responding to the freshest, but with full context to
+# override (e.g., if the freshest is a noisy notif and an earlier message
+# is a direct ask).
+POLL_USER_MESSAGE_TEMPLATE = """\
+TICK POLL: You are checking in. The inbox below contains every trigger that
+arrived for you since your last poll, most recent first. Pick at most ONE
+to act on (or stay silent). Triggers you don't act on remain queued and may
+be considered next tick.
+
+INBOX (most recent first):
+{inbox_json}
+
+RELEVANT CONTEXT FROM YOUR VIEW OF THE WORLD:
+{context_excerpt}
+"""
+
+
 NPC_ACT_TOOL: dict[str, Any] = {
     "name": "npc_act",
     "description": (
@@ -250,6 +269,25 @@ class AnthropicNPCBrain:
         return "\n\n".join(blocks)
 
     def _build_user_message(self, context: NpcBrainContext) -> str:
+        # Tick-poll context: render the inbox of accumulated triggers.
+        # Falls back to the legacy single-trigger template for meeting
+        # turns (where the runtime sets trigger_kind="meeting_turn" and
+        # populates trigger_payload directly).
+        if context.triggers:
+            inbox_items = [
+                {
+                    "kind": t.kind, "sim_time": t.sim_time, "payload": t.payload,
+                }
+                for t in context.triggers
+            ]
+            inbox_json = json.dumps(inbox_items, indent=2, default=str)
+            if len(inbox_json) > 4000:
+                inbox_json = inbox_json[:4000] + "\n... (truncated)"
+            return POLL_USER_MESSAGE_TEMPLATE.format(
+                inbox_json=inbox_json,
+                context_excerpt=context.context_excerpt or "(no additional context)",
+            )
+
         # Cap the payload JSON to keep tokens bounded on pathological inputs
         # — long tasks/docs etc. The context_excerpt is already capped by
         # the runtime.
@@ -257,7 +295,7 @@ class AnthropicNPCBrain:
         if len(payload_json) > 4000:
             payload_json = payload_json[:4000] + "\n... (truncated)"
         return USER_MESSAGE_TEMPLATE.format(
-            trigger_kind=context.trigger_kind,
+            trigger_kind=context.trigger_kind or "(none)",
             payload_json=payload_json,
             context_excerpt=context.context_excerpt or "(no additional context)",
         )

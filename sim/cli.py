@@ -49,13 +49,16 @@ def _add_run(sub):
     p.add_argument("--agent", default="scripted_noop",
                    help="Which agent to run: 'scripted_noop' or 'anthropic'")
     p.add_argument("--model", default=None, help="Override model name for anthropic agent")
+    p.add_argument("--tick-size", type=int, default=None,
+                   help="Override the scenario's tick_size_minutes (1..240). "
+                        "Omit to use the per-scenario default.")
     p.add_argument("--log-dir", type=Path, default=Path("runs"),
                    help="Output directory for run artifacts. Use '-' to disable.")
     p.set_defaults(func=_cmd_run)
 
 
 def _cmd_run(args):
-    scenario = load_scenario(args.scenario)
+    scenario = load_scenario(args.scenario, tick_size_minutes=args.tick_size)
     # NPC brain: default to Sonnet 4.6 when ANTHROPIC_API_KEY is set so NPCs
     # actually behave like the characters the persona files describe.
     # Without it, every NPC trigger fires the default stub brain (effectively
@@ -96,10 +99,13 @@ def _cmd_run(args):
         rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
         DriverConfig(max_turns=args.max_turns, end_sim_time=scenario.config.end_sim_time),
         turn_observer=(logger.log_turn if logger else None),
+        tick_size_minutes=scenario.config.tick_size_minutes,
+        agent_id=scenario.config.agent_id,
     )
     turns = driver.run()
     if logger:
-        logger.finalize(rt.world, scenario.config, args.scenario)
+        logger.finalize(rt.world, scenario.config, args.scenario,
+                        final_sim_time=rt.scheduler.sim_time)
         print(f"Completed {len(turns)} turns; final sim_time={rt.scheduler.sim_time}; run dir: {logger.run_dir}")
     else:
         print(f"Completed {len(turns)} turns; final sim_time={rt.scheduler.sim_time}")

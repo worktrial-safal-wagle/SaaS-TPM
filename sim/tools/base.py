@@ -23,11 +23,20 @@ from sim.store import Notification, World
 
 
 class ToolCall(BaseModel):
-    """A single agent decision: which tool, with which args."""
+    """A single agent decision: which tool, with which args.
+
+    `continue_in_tick`: opt-in flag used by the tick-driven AgentDriver to
+    let the agent chain a second decision in the same tick. Default `False`
+    means the driver ends the tick after this dispatch (the standard
+    cadence: 1 decision per tick). Set to `True` to request another
+    immediate `next_call`. Hard-capped at 4 chained decisions per tick by
+    the driver; ignored by the tool registry itself.
+    """
 
     model_config = ConfigDict(extra="forbid")
     tool: str
     args: dict[str, Any] = Field(default_factory=dict)
+    continue_in_tick: bool = False
 
 
 class ToolResult(BaseModel):

@@ -1,9 +1,18 @@
 from __future__ import annotations
 
 import heapq
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
 from sim.scheduler.event import Event, EventHandler
+
+if TYPE_CHECKING:
+    from sim.store.world import World
+
+
+# Event kinds. Mirrors the `npc_reaction` pattern (a bare string used at
+# schedule sites) but exposed as a module-level constant so downstream
+# code can import it instead of stringly-typing the literal.
+EVENT_KIND_ACTOR_POLL = "actor_poll"
 
 
 class Scheduler:
@@ -62,7 +71,9 @@ class Scheduler:
     def next_matching_fire_at(self, kinds: set[str]) -> int | None:
         """Earliest `fire_at` among pending events whose `kind` is in `kinds`.
 
-        Used by `wait.for_next_event` to advance to the next agent-visible signal.
+        Legacy helper retained for tooling that wants to peek at the next
+        upcoming event of certain kinds. The tick-based agent loop no longer
+        relies on this — agents are polled on their personal tick cadence.
         """
         candidates = [e.fire_at for e in self._heap if e.kind in kinds]
         return min(candidates) if candidates else None
@@ -97,3 +108,37 @@ class Scheduler:
 
 
 Clock = Scheduler
+
+
+def schedule_actor_poll(
+    scheduler: Scheduler,
+    world: "World",
+    actor_id: str,
+    tick_size_minutes: int,
+) -> Event:
+    """Schedule the next poll for an actor using personal cadence semantics.
+
+    fire_at = max(scheduler.sim_time + tick_size_minutes, actor.busy_until)
+
+    Each actor has their own next-poll cadence (not aligned to a global
+    grid). When an actor finishes a long action, their next poll lands at
+    the later of:
+      - sim_time + tick_size (the actor's normal tick cadence), or
+      - busy_until (when the long action completes).
+
+    The event uses a deterministic `event_id` payload key
+    (`f"actor_poll.{actor_id}.{fire_at}"`) so identical schedule calls
+    produce identical payload event_id strings — replay depends on this.
+    The Event's numeric `event_id` is the scheduler's monotonic counter,
+    which keeps heap ordering deterministic.
+    """
+    actor = world.get_person(actor_id)
+    if actor is None:
+        raise ValueError(f"unknown actor: {actor_id}")
+    fire_at = max(scheduler.sim_time + tick_size_minutes, actor.busy_until)
+    event_id_str = f"actor_poll.{actor_id}.{fire_at}"
+    return scheduler.schedule(
+        fire_at=fire_at,
+        kind=EVENT_KIND_ACTOR_POLL,
+        payload={"actor_id": actor_id, "event_id": event_id_str},
+    )

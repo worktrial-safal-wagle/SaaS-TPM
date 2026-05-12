@@ -108,6 +108,50 @@ objectives:
       task_id: task.V24-3
       expected_statuses: ["In Review", "Done"]
 
+  # === PRIORITIZATION (urgent inbound → fast ack) ===
+  # Continuous latency signal — rewards triaging the urgent thing first.
+  # Latency = (ack_sim_time - trigger_sim_time). Score = clip(1 - latency/target).
+  - id: maya_migration_dm_acked_fast
+    description: "Maya's Mon-morning DM about flaky migration is a buried blocker; agent should engage quickly (reply to Maya or loop Kai in)."
+    check:
+      kind: urgent_ack_latency
+      trigger:
+        kind: dm_received
+        sender_id: person.maya
+        after_sim_time: 120
+        body_contains_any: ["migration", "flaky", "timeout", "events table"]
+      ack:
+        kind: agent_outbound_with_keywords
+        to: [person.maya, person.kai]
+        keywords_any: ["migration", "events", "workspace_id", "deploy", "flaky"]
+      target_latency_minutes: 240  # 4 sim-hours
+
+  - id: bigcorp_escalation_acked_fast
+    description: "BigCorp pipeline-failure escalation: agent must reply on the thread quickly (already a stakeholder SLA, but here we measure continuous latency)."
+    check:
+      kind: urgent_ack_latency
+      trigger:
+        kind: email_received
+        sender_id: person.bigcorp
+        subject_contains: "URGENT"
+      ack:
+        kind: email_reply_to_sender
+        thread_subject_contains: "URGENT"
+      target_latency_minutes: 120  # match the binary SLA
+
+  - id: ceo_summary_acked_fast
+    description: "Latency from CEO ask to agent's first outbound progress (reply or summary draft)."
+    check:
+      kind: urgent_ack_latency
+      trigger:
+        kind: email_received
+        sender_id: person.alex
+        subject_contains: "launch-readiness"
+      ack:
+        kind: email_reply_to_sender
+        thread_subject_contains: "launch"
+      target_latency_minutes: 480  # 8 sim-hours (ask is "by EOD")
+
 artifacts:
   - id: ceo_launch_readiness_email
     description: "The Wednesday launch-readiness email Robin sends to the CEO."
@@ -148,16 +192,6 @@ artifacts:
       - "Commits to a follow-up time."
 
 anti_hack:
-  - id: chat_message_volume_cap
-    description: "Cap on total chat messages from the agent over the week."
-    signal:
-      kind: max_messages_total
-      max: 120
-  - id: per_channel_message_cap
-    description: "Cap on messages-per-channel-per-day to discourage spamming."
-    signal:
-      kind: max_messages_per_channel_per_day
-      max: 25
   - id: repeat_read_cap
     description: "Reading the same artifact ≥3× without acting is penalised."
     signal:
@@ -194,3 +228,33 @@ hidden_facts:
     source_locator:
       kind: doc_conflict
       docs: [doc.audit_prd, doc.audit_eng_spec]
+
+# === FOLLOW-UP TARGETS (for follow_up_rate metric) ===
+# Each entry declares an NPC the agent is expected to contact. If the NPC
+# doesn't reply within `target_minutes`, the agent should follow up. Per-target
+# score: +1 if NPC replied in window OR agent re-pinged about the same topic;
+# -1 if neither.
+follow_up_targets:
+  - id: follow_up_kai_on_migration
+    description: "Agent DMs Kai about the migration risk Maya flagged. If Kai doesn't reply within 4 sim-hours, agent should follow up."
+    npc_id: person.kai
+    target_minutes: 240
+    keywords_any: ["migration", "events table", "workspace_id", "flaky"]
+
+  - id: follow_up_priya_on_audit_format
+    description: "Agent reaches out to Priya for input on the audit-log date format. If Priya goes silent for 4 sim-hours, agent should ping again."
+    npc_id: person.priya
+    target_minutes: 240
+    keywords_any: ["audit", "date format", "ISO-8601", "UTC", "localised"]
+
+# === APPROPRIATE ABANDONMENTS (for appropriate_abandonments_rate metric) ===
+# Each entry declares a calendar event during which abandoning (via
+# `abandon.current`) is appropriate because an urgent_ack_latency trigger
+# fires inside the event window. Per declaration:
+#   +1   agent called abandon.current during the event AND a trigger was present
+#   +0.5 agent abandoned without a trigger (false positive)
+#   -1   agent didn't abandon when expected
+appropriate_abandonments:
+  - id: abandon_standup_wed_for_ceo_ask
+    description: "The CEO's launch-readiness email fires at sim_time 2910 — exactly when cal.standup.wed begins. Standup is low-stakes and short; the CEO's same-day deadline warrants stepping out to acknowledge the request."
+    during_event: cal.standup.wed

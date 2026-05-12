@@ -54,7 +54,7 @@ If you see a ⚠️ Stall warning in the briefing, you have been reading
 without advancing time. STOP reading. Take a write action this turn
 (`chat.send`, `chat.dm`, `email.send`, `tasks.update_status`,
 `tasks.comment`, `docs.edit`, `docs.comment`) OR call
-`wait__for_next_event` to skip to the next event.
+`idle__until` to skip ahead and the driver will repoll you later.
 
 Invoke exactly one of the tools provided. The available tool names and
 their input schemas are listed in the `tools` parameter.

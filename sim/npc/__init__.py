@@ -3,6 +3,7 @@ from sim.npc.brain import (
     NpcBrain,
     NpcBrainContext,
     NpcBrainOutput,
+    NpcTrigger,
     StubBrain,
 )
 from sim.npc.policy import NpcPolicy
@@ -16,6 +17,7 @@ __all__ = [
     "NpcBrainOutput",
     "NpcPolicy",
     "NpcRuntime",
+    "NpcTrigger",
     "StubBrain",
 ]
 

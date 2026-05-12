@@ -14,6 +14,7 @@ from sim.scheduler import Scheduler
 from sim.store import Channel, Message, World
 from sim.tools.acl import channel_visible_to
 from sim.tools.base import ToolOp
+from sim.tools.presence import presence_for_person
 from sim.tools.suggest import suggest_id
 from sim.tools.costs import (
     COST_CHAT_DM,
@@ -117,17 +118,40 @@ def chat_dm(world: World, scheduler: Scheduler, args: ChatDmArgs, caller_id: str
 
 
 class ChatReadArgs(BaseModel):
-    channel_id: str
+    channel_id: str | None = None
+    # For DMs, you can pass `recipient_id` instead of `channel_id` and the tool
+    # resolves to the canonical (alphabetically-sorted) DM channel for the
+    # caller-recipient pair. This avoids the wrong-direction `dm.tpm__kai`
+    # failure mode where models construct IDs from their own perspective.
+    recipient_id: str | None = None
     since: int | None = None
     limit: int | None = None
 
 
+def _resolve_channel_id(world: World, args: Any, caller_id: str) -> str:
+    """Returns the channel_id from args, resolving `recipient_id` for DMs.
+
+    Validates: exactly one of (channel_id, recipient_id) must be set. If
+    `recipient_id`, both the recipient and the DM channel must exist —
+    the DM is created on first `chat.dm` send, so a read before any DM
+    activity returns 'no such channel'.
+    """
+    if (args.channel_id is None) == (args.recipient_id is None):
+        raise ToolError("must provide exactly one of channel_id or recipient_id")
+    if args.recipient_id is not None:
+        if world.get_person(args.recipient_id) is None:
+            raise ToolError(suggest_id("person", args.recipient_id, world.people.keys()))
+        return _dm_channel_id(caller_id, args.recipient_id)
+    return args.channel_id
+
+
 def chat_read(world: World, scheduler: Scheduler, args: ChatReadArgs, caller_id: str) -> dict[str, Any]:
-    if args.channel_id not in world.channels:
-        raise ToolError(suggest_id("channel", args.channel_id, world.channels.keys()))
-    if not channel_visible_to(world, args.channel_id, caller_id):
-        raise ToolError(f"not a member of channel: {args.channel_id}")
-    msgs = world.messages_in_channel(args.channel_id)
+    channel_id = _resolve_channel_id(world, args, caller_id)
+    if channel_id not in world.channels:
+        raise ToolError(suggest_id("channel", channel_id, world.channels.keys()))
+    if not channel_visible_to(world, channel_id, caller_id):
+        raise ToolError(f"not a member of channel: {channel_id}")
+    msgs = world.messages_in_channel(channel_id)
     if args.since is not None:
         msgs = [m for m in msgs if m.sim_time > args.since]
     if args.limit is not None:
@@ -136,7 +160,7 @@ def chat_read(world: World, scheduler: Scheduler, args: ChatReadArgs, caller_id:
     for m in msgs:
         if caller_id not in m.read_by:
             m.read_by.append(caller_id)
-    return {"channel_id": args.channel_id, "messages": [m.model_dump() for m in msgs]}
+    return {"channel_id": channel_id, "messages": [m.model_dump() for m in msgs]}
 
 
 # ---------------------------------------------------------------------------
@@ -155,11 +179,23 @@ def chat_list(world: World, scheduler: Scheduler, args: ChatListArgs, caller_id:
             continue
         if not channel_visible_to(world, channel.id, caller_id):
             continue
-        out.append({
+        entry: dict[str, Any] = {
             "id": channel.id, "name": channel.name, "is_dm": channel.is_dm,
             "is_private": channel.is_private, "members": list(channel.members),
             "topic": channel.topic,
-        })
+        }
+        # Presence for DMs: surface the *other* peer's availability so the
+        # agent can decide whether a DM is likely to land vs. wait for them
+        # to come out of a meeting. Same shape as `directory.presence`.
+        if channel.is_dm:
+            peer_id = next((m for m in channel.members if m != caller_id), None)
+            if peer_id is not None:
+                peer = world.get_person(peer_id)
+                if peer is not None:
+                    entry["presence"] = presence_for_person(
+                        world, peer, scheduler.sim_time,
+                    )
+        out.append(entry)
     return {"channels": out}
 
 
@@ -169,20 +205,22 @@ def chat_list(world: World, scheduler: Scheduler, args: ChatListArgs, caller_id:
 
 
 class ChatMarkReadArgs(BaseModel):
-    channel_id: str
+    channel_id: str | None = None
+    recipient_id: str | None = None
 
 
 def chat_mark_read(world: World, scheduler: Scheduler, args: ChatMarkReadArgs, caller_id: str) -> dict[str, Any]:
-    if args.channel_id not in world.channels:
-        raise ToolError(suggest_id("channel", args.channel_id, world.channels.keys()))
-    if not channel_visible_to(world, args.channel_id, caller_id):
-        raise ToolError(f"not a member of channel: {args.channel_id}")
+    channel_id = _resolve_channel_id(world, args, caller_id)
+    if channel_id not in world.channels:
+        raise ToolError(suggest_id("channel", channel_id, world.channels.keys()))
+    if not channel_visible_to(world, channel_id, caller_id):
+        raise ToolError(f"not a member of channel: {channel_id}")
     count = 0
-    for m in world.messages_in_channel(args.channel_id):
+    for m in world.messages_in_channel(channel_id):
         if caller_id not in m.read_by:
             m.read_by.append(caller_id)
             count += 1
-    return {"channel_id": args.channel_id, "marked": count}
+    return {"channel_id": channel_id, "marked": count}
 
 
 # ---------------------------------------------------------------------------
@@ -200,11 +238,11 @@ def chat_ops() -> list[ToolOp]:
                description="Send a direct message to another person. The DM channel is created on first use."),
         ToolOp(name="chat.read", args_model=ChatReadArgs,
                cost=COST_CHAT_READ, handler=chat_read,
-               description="Read messages from a channel; optionally filter by `since` sim_time. Free, but does not bypass the cost of acting on what you read."),
+               description="Read messages from a channel. Pass either `channel_id` for any channel, OR `recipient_id` for a DM (resolves to the right DM channel automatically — no need to construct the DM channel ID). Optionally filter by `since` sim_time."),
         ToolOp(name="chat.list", args_model=ChatListArgs,
                cost=COST_CHAT_LIST, handler=chat_list,
                description="List all channels visible to you."),
         ToolOp(name="chat.mark_read", args_model=ChatMarkReadArgs,
                cost=COST_CHAT_MARK_READ, handler=chat_mark_read,
-               description="Mark all messages in a channel as read."),
+               description="Mark all messages in a channel as read. Pass either `channel_id` or `recipient_id` (same as `chat.read`)."),
     ]

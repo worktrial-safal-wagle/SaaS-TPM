@@ -119,9 +119,21 @@ class RunLogger:
         scenario_path: Path | None = None,
         *,
         status: str = "completed",
+        final_sim_time: int | None = None,
     ) -> None:
+        """Write end-of-run artifacts.
+
+        `final_sim_time`, if provided, is the scheduler's clock at termination.
+        Pass it explicitly when the clock advanced past the last logged turn
+        (e.g., the driver bumps sim_time to end_sim_time on graceful idle-out).
+        Without it, we fall back to the last turn's `sim_time_after` from
+        `turns.jsonl` — which under-reports when the driver advances post-turn
+        and causes the eval's `requires_full_run` tier gate to misfire.
+        """
         if self._closed:
             return
+        if final_sim_time is None:
+            final_sim_time = _read_sim_time_from_jsonl(self.run_dir / "turns.jsonl")
         (self.run_dir / "world_final.json").write_text(world.to_json())
         (self.run_dir / "run.json").write_text(json.dumps({
             "scenario_id": config.id,
@@ -129,6 +141,7 @@ class RunLogger:
             "end_sim_time": config.end_sim_time,
             "agent_id": config.agent_id,
             "status": status,
+            "final_sim_time": final_sim_time,
             "completed_at": dt.datetime.now(dt.UTC).isoformat(),
         }, indent=2))
         (self.run_dir / "index.json").write_text(json.dumps({
@@ -136,7 +149,7 @@ class RunLogger:
             "error_count": self._error_count,
             "verdict_count": self._verdict_count,
             "tool_counts": dict(self._tool_counts),
-            "final_sim_time": _read_sim_time_from_jsonl(self.run_dir / "turns.jsonl"),
+            "final_sim_time": final_sim_time,
         }, indent=2))
         (self.run_dir / "SCHEMA.md").write_text(_render_schema_doc())
         (self.run_dir / "transcript.md").write_text("\n\n".join(self._transcript_lines))

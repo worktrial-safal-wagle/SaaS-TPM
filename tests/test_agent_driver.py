@@ -364,20 +364,317 @@ def test_failed_tool_call_advances_sim_time():
 
 def test_repeated_failed_calls_eventually_cross_end_sim_time():
     """The agent loop terminates against end_sim_time even when the agent
-    keeps calling a failing tool — this was the infinite-loop bug."""
+    keeps calling a failing tool — this was the infinite-loop bug. With
+    the tick-driven loop, end_sim_time must be at least one tick (default
+    15 sim-min) for the agent to be polled at all; we use 60 here so the
+    agent gets multiple polls before termination."""
     from sim.tools import ToolCall
     s = load_scenario(SMOKE)
     rt = build_runtime(s)
-    assembler = BriefingAssembler(rt.world, end_sim_time=10)
+    assembler = BriefingAssembler(rt.world, end_sim_time=60)
     # Agent keeps calling an unknown tool. With cost=1 on failure, sim_time
-    # crosses 10 in <= 11 turns.
+    # crosses 60 in <= 60 ticks.
     agent = ScriptedAgent([], default=ToolCall(tool="bogus.tool", args={}))
     driver = AgentDriver(
         rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
-        DriverConfig(max_turns=100, end_sim_time=10),
+        DriverConfig(max_turns=100, end_sim_time=60),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
     )
     turns = driver.run()
-    # Loop should terminate around turn 10-11 (each failed call advances
-    # sim_time by 1), well before the max_turns=100 cap.
+    # Each failed bogus.tool call costs 1 sim-min; the next poll is 15 min
+    # later. So sim_time roughly == 16 * N at end of tick N. We expect <= 5
+    # ticks before crossing end=60. The cap is well below max_turns=100.
     assert len(turns) <= 12, f"expected <= 12 turns, got {len(turns)}"
-    assert rt.scheduler.sim_time >= 10
+    assert rt.scheduler.sim_time >= 60
+
+
+# ---------------------------------------------------------------------------
+# Phase 3: tick-driven loop
+# ---------------------------------------------------------------------------
+
+
+def _make_runtime_for_tick_tests():
+    """Build a smoke runtime for tick-driven driver tests. Returns
+    `(scenario, runtime)` so test sites can read tick_size_minutes /
+    agent_id from the scenario config."""
+    s = load_scenario(SMOKE)
+    rt = build_runtime(s)
+    return s, rt
+
+
+def test_tick_driven_loop_polls_at_tick_cadence():
+    """With tick_size=15, the agent's first poll fires at sim_time=15. Each
+    one-min tool call leaves sim_time at 16 → next poll at 31, and so on.
+    A scripted noop run lands on the expected sim_time grid."""
+    s, rt = _make_runtime_for_tick_tests()
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    # Each tasks.list costs 1 sim-min. After 3 ticks, sim_time = 48.
+    agent = ScriptedAgent([], default=ToolCall(tool="tasks.list", args={}))
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=3, end_sim_time=s.config.end_sim_time),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    turns = driver.run()
+    assert len(turns) == 3
+    # Tick 1 fires at sim_time=15; tasks.list costs 1 → 16.
+    assert turns[0].sim_time_before == 15
+    assert turns[0].sim_time_after == 16
+    # Tick 2 fires at max(16+15, 0) = 31; → 32.
+    assert turns[1].sim_time_before == 31
+    assert turns[1].sim_time_after == 32
+    # Tick 3 fires at max(32+15, 0) = 47; → 48.
+    assert turns[2].sim_time_before == 47
+    assert turns[2].sim_time_after == 48
+
+
+def test_tick_loop_terminates_when_end_sim_time_reached():
+    """When the agent runs `wait.until(end_sim_time)`, the driver loop
+    exits cleanly on the next iteration."""
+    s, rt = _make_runtime_for_tick_tests()
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    agent = ScriptedAgent([
+        ToolCall(tool="wait.until", args={"target_sim_time": s.config.end_sim_time}),
+    ])
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=20, end_sim_time=s.config.end_sim_time),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    turns = driver.run()
+    assert rt.scheduler.sim_time >= s.config.end_sim_time
+    # The driver only ran ONE tick before sim_time crossed end.
+    assert len(turns) == 1
+
+
+def test_continue_in_tick_chains_two_decisions_in_same_tick():
+    """Default 1 decision per tick. Setting `continue_in_tick=True` on the
+    first call's response lets the agent do a second action immediately
+    in the same tick."""
+    s, rt = _make_runtime_for_tick_tests()
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    # Decision 1 chains; decision 2 is the last in the tick.
+    agent = ScriptedAgent([
+        ToolCall(tool="tasks.list", args={}, continue_in_tick=True),
+        ToolCall(tool="tasks.list", args={}),
+    ])
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=2, end_sim_time=s.config.end_sim_time),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    turns = driver.run()
+    assert len(turns) == 2
+    # Both turns fired in the SAME tick — sim_time_before of turn[1] is
+    # turn[0].sim_time_after (no tick gap between).
+    assert turns[1].sim_time_before == turns[0].sim_time_after
+    # The first tick fired at 15; both decisions happened back-to-back.
+    assert turns[0].sim_time_before == 15
+    assert turns[1].sim_time_after == 17  # 15 + 1 + 1
+
+
+def test_continue_in_tick_hard_cap_at_four():
+    """Even if the agent requests 5 chained decisions, the driver only
+    dispatches 4 per tick (the design-locked cap). The 5th decision
+    lands in the next tick.
+
+    Scripted call layout: [chain, chain, chain, chain, no-chain]. The cap
+    triggers between calls 4 and 5; call 5 is dispatched on tick 2
+    without further chaining.
+    """
+    s, rt = _make_runtime_for_tick_tests()
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    # Four chaining decisions followed by a non-chaining 5th. Without the
+    # cap, the agent would also try to chain the 5th — we test that the
+    # cap intervenes by checking that turn 5 (next-tick) does NOT chain.
+    chained = [
+        ToolCall(tool="tasks.list", args={}, continue_in_tick=True),
+        ToolCall(tool="tasks.list", args={}, continue_in_tick=True),
+        ToolCall(tool="tasks.list", args={}, continue_in_tick=True),
+        ToolCall(tool="tasks.list", args={}, continue_in_tick=True),
+        ToolCall(tool="tasks.list", args={}),  # 5th, no chain
+    ]
+    agent = ScriptedAgent(chained)
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        # max_turns=10 so the cap (not max_turns) terminates the chain.
+        DriverConfig(max_turns=10, end_sim_time=s.config.end_sim_time),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    turns = driver.run()
+    # All 4 chained decisions fired in tick 1; the 5th was deferred to
+    # tick 2. After tick 2 the queue is exhausted and the default
+    # `wait.until(end_sim_time)` ends the simulation in tick 3 (one more
+    # turn), so we expect exactly 6 turns.
+    assert len(turns) == 6
+    # Tick 1 ran 4 chained decisions: sim_time 15→16→17→18→19.
+    for i in range(4):
+        assert turns[i].sim_time_before == 15 + i, (
+            f"turn {i} sim_time_before was {turns[i].sim_time_before}, expected {15 + i}"
+        )
+        assert turns[i].sim_time_after == 16 + i
+    # Cap kicked in: turn 4 (the 5th decision) landed in TICK 2, not
+    # tick 1. Tick 2 fires at max(19+15, 0) = 34.
+    assert turns[4].sim_time_before == 34
+
+
+def test_action_straddles_tick_pushes_next_poll_past_action_end():
+    """A 24-min action started at tick start (sim_time=15) ends at
+    sim_time=39. The next poll fires at max(39 + 15, busy_until) = 54
+    because the action straddled the 15-min tick boundary."""
+    s, rt = _make_runtime_for_tick_tests()
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    # docs.create cost = min(90, 15 + len(body)/100). A 900-char body →
+    # cost = 15 + 9 = 24 min.
+    body_900_chars = "x" * 900
+    agent = ScriptedAgent([
+        ToolCall(tool="docs.create", args={
+            "doc_id": "doc.straddle", "title": "straddle test", "body": body_900_chars,
+        }),
+        ToolCall(tool="tasks.list", args={}),
+    ])
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=2, end_sim_time=s.config.end_sim_time),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    turns = driver.run()
+    assert len(turns) == 2
+    # Tick 1: docs.create runs at sim_time=15, costs 24 min, ends at 39.
+    assert turns[0].sim_time_before == 15
+    assert turns[0].sim_time_after == 39
+    # Tick 2 fires at max(39 + 15, 0) = 54. The action straddled the 15-min
+    # tick boundary, so the next poll lands AFTER the action's end, not
+    # at the next tick-cadence multiple.
+    assert turns[1].sim_time_before == 54
+
+
+def test_idle_until_overrides_next_poll_at():
+    """`idle.until` from inside a tick reschedules the next poll to a
+    later sim_time and skips the standard tick cadence."""
+    s, rt = _make_runtime_for_tick_tests()
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    agent = ScriptedAgent([
+        # At sim_time=15, idle until sim_time=80 → poll@80.
+        ToolCall(tool="idle.until", args={"target_sim_time": 80}),
+        # Next tick: just list to mark the poll.
+        ToolCall(tool="tasks.list", args={}),
+    ])
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=2, end_sim_time=s.config.end_sim_time),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    turns = driver.run()
+    assert len(turns) == 2
+    # Tick 1 at sim_time=15. idle.until costs 1 → sim_time=16. Next poll
+    # was set to 80 (idle target).
+    assert turns[0].sim_time_before == 15
+    assert turns[0].call.tool == "idle.until"
+    # Tick 2 fires at sim_time=80 (the idle target).
+    assert turns[1].sim_time_before == 80
+
+
+def test_initial_actor_poll_scheduled_via_build_runtime():
+    """`build_runtime` must schedule the agent's first poll. The smoke
+    runtime should have exactly one pending `actor_poll` for the agent at
+    sim_time = tick_size_minutes."""
+    from sim.scheduler import EVENT_KIND_ACTOR_POLL
+    s, rt = _make_runtime_for_tick_tests()
+    polls = [
+        e for e in rt.scheduler.pending()
+        if e.kind == EVENT_KIND_ACTOR_POLL
+        and e.payload.get("actor_id") == s.config.agent_id
+    ]
+    assert len(polls) >= 1, "expected at least one initial actor_poll for the agent"
+    assert polls[0].fire_at == s.config.tick_size_minutes
+
+
+def test_continue_in_tick_defaults_to_false():
+    """A ToolCall without an explicit `continue_in_tick` flag has it set
+    to False — backwards compatible with all existing tool-call sites."""
+    call = ToolCall(tool="tasks.list", args={})
+    assert call.continue_in_tick is False
+
+
+def test_abandon_truncates_busy_until_inside_a_tick():
+    """abandon.current called by the agent inside a tick truncates the
+    agent's own busy_until to current + 2 (the transition cost)."""
+    from sim.tools.abandon import ABANDON_TRANSITION_COST_MIN
+    s, rt = _make_runtime_for_tick_tests()
+    # Pre-set the agent's busy_until far in the future to simulate an
+    # in-flight long action; the test then drives a single tick where the
+    # agent calls abandon.current.
+    rt.world.get_person(s.config.agent_id).busy_until = 200
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    agent = ScriptedAgent([
+        ToolCall(tool="abandon.current", args={}),
+    ])
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=1, end_sim_time=s.config.end_sim_time),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    driver.run()
+    person = rt.world.get_person(s.config.agent_id)
+    # Tick fired at 15; abandon called at sim_time=15 truncates busy_until
+    # to 15 + 2 = 17.
+    assert person.busy_until == 15 + ABANDON_TRANSITION_COST_MIN
+
+
+def test_tick_driven_loop_max_turns_caps_total_decisions():
+    """`max_turns` caps the TOTAL number of dispatched decisions across
+    all ticks, not the number of ticks. Useful for the eval to bound
+    runtime regardless of tick cadence."""
+    s, rt = _make_runtime_for_tick_tests()
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    agent = ScriptedAgent([], default=ToolCall(tool="tasks.list", args={}))
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=4, end_sim_time=s.config.end_sim_time),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    turns = driver.run()
+    assert len(turns) == 4
+
+
+def test_driver_advances_to_end_sim_time_when_next_poll_is_past_end():
+    """When the agent's last action defers the next poll past end_sim_time
+    (e.g., `idle.until` that lands beyond the week), the driver must advance
+    `sim_time` to `end_sim_time` on termination — otherwise the eval's
+    `requires_full_run` tier gate (`final_sim_time >= end_sim_time`) won't
+    fire and `deadline_hit_rate` / `stakeholder_contact_rate` are silently
+    dropped from the scorecard."""
+    s, rt = _make_runtime_for_tick_tests()
+    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
+    # Idle to a sim_time near (but before) end_sim_time, then idle again to
+    # something past end_sim_time. The second idle.until reschedules the
+    # next poll past end, so the driver should terminate and bump sim_time
+    # to end_sim_time.
+    end = s.config.end_sim_time
+    agent = ScriptedAgent([
+        ToolCall(tool="idle.until", args={"target_sim_time": end - 10}),
+        ToolCall(tool="idle.until", args={"target_sim_time": end + 60}),
+    ])
+    driver = AgentDriver(
+        rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
+        DriverConfig(max_turns=10, end_sim_time=end),
+        tick_size_minutes=s.config.tick_size_minutes,
+        agent_id=s.config.agent_id,
+    )
+    driver.run()
+    # Without the fix, sim_time would be < end_sim_time (stuck wherever the
+    # last idle.until landed). With the fix, the driver bumps it to end.
+    assert rt.scheduler.sim_time >= end, (
+        f"driver should advance sim_time to end_sim_time on graceful "
+        f"termination; got {rt.scheduler.sim_time}, expected >= {end}"
+    )
