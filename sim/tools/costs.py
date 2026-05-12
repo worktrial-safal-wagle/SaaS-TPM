@@ -2,11 +2,20 @@
 
 Costs are *declared upfront*. The agent cannot opt out, cannot reduce them by
 batching, and cannot pretend a long action was free. This is what makes
-"spam everyone" actually burn the morning.
+"spam everyone" actually burn the morning — and what makes "read the same
+inbox 30 times" actually consume the day.
 
 Costs are integer minutes. For variable-cost tools (docs.create, email.send,
 log_work), a function takes parsed args and returns the cost; for fixed-cost
 tools, the value is a plain int.
+
+**Reads have real cost.** Originally all read/list ops were 0, which made
+sim_time uncoupled from cognitive effort: an agent could spend 50 turns
+scanning the inbox without "spending" any of its workday. That broke the
+spec's simulated-time premise — max_turns became the binding budget instead
+of sim_time. A real TPM scanning their inbox takes 30s–2min per artifact;
+that's now reflected here. The agent is still free to read, but reading is
+now a real time choice with a real opportunity cost.
 """
 
 from __future__ import annotations
@@ -27,12 +36,12 @@ AGENT_VISIBLE_EVENT_KINDS: set[str] = {
 # Fixed costs (minutes)
 COST_CHAT_SEND = 1
 COST_CHAT_DM = 1
-COST_CHAT_READ = 0
-COST_CHAT_LIST = 0
-COST_CHAT_MARK_READ = 0
+COST_CHAT_READ = 1   # scanning a small batch of messages
+COST_CHAT_LIST = 1   # glancing at the channel list
+COST_CHAT_MARK_READ = 0   # one click — basically free
 
-COST_TASKS_LIST = 0
-COST_TASKS_GET = 0
+COST_TASKS_LIST = 1   # scanning the board
+COST_TASKS_GET = 1    # opening a task
 COST_TASKS_CREATE = 2
 COST_TASKS_UPDATE_STATUS = 1
 COST_TASKS_ASSIGN = 1
@@ -40,26 +49,26 @@ COST_TASKS_ADD_DEPENDENCY = 1
 COST_TASKS_COMMENT = 1
 
 # Email costs
-COST_EMAIL_LIST = 0
-COST_EMAIL_READ = 0
-COST_EMAIL_SEND_BASE = 3  # mins to compose a short email
+COST_EMAIL_LIST = 1
+COST_EMAIL_READ = 2   # reading an email thoroughly takes longer than a chat
+COST_EMAIL_SEND_BASE = 3
 
 # Calendar
-COST_CAL_LIST = 0
-COST_CAL_GET = 0
+COST_CAL_LIST = 1
+COST_CAL_GET = 1
 COST_CAL_RSVP = 1
 COST_CAL_CREATE = 2
 
 # Docs
-COST_DOC_LIST = 0
-COST_DOC_READ = 5  # reading a doc takes attention
+COST_DOC_LIST = 1
+COST_DOC_READ = 5   # reading a doc takes attention (longer than a chat)
 COST_DOC_COMMENT = 2
 
 # Directory / notifications
-COST_DIR_LIST = 0
-COST_DIR_GET = 0
-COST_NOTIF_LIST = 0
-COST_NOTIF_MARK_READ = 0
+COST_DIR_LIST = 1
+COST_DIR_GET = 1
+COST_NOTIF_LIST = 1
+COST_NOTIF_MARK_READ = 0   # one click
 
 
 def cost_email_send(args: Any) -> int:

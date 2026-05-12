@@ -126,63 +126,27 @@ def test_reference_agent_requires_tool_specs():
         ReferenceAgent(client=_Client())
 
 
-def test_briefing_surfaces_stall_warning_after_repeated_free_reads():
-    """If the agent keeps calling free tools, sim_time doesn't advance and
-    the briefing's stall counter grows."""
+def test_briefing_renders_stall_warning_when_counter_high():
+    """The briefing's stall warning surfaces when sim_time_stalled_for_turns
+    is high enough — defensive UI for any case where sim_time doesn't advance
+    (e.g., wait.until called with target equal to current sim_time, or
+    no-cost mark_read calls repeated)."""
     s = load_scenario(SMOKE)
     rt = build_runtime(s)
     assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
-    captured: list[int] = []
-
-    class Recorder:
-        def decide(self, briefing):
-            captured.append(briefing.sim_time_stalled_for_turns)
-            return ToolCall(tool="tasks.list", args={})  # free read
-
-    driver = AgentDriver(
-        rt.world, rt.scheduler, rt.agent_registry, Recorder(), assembler,
-        DriverConfig(max_turns=5, end_sim_time=s.config.end_sim_time),
-    )
-    driver.run()
-    # Stall counter grows as the agent keeps reading without advancing time.
-    assert captured == [0, 1, 2, 3, 4]
-    # And by turn 4+ the rendered briefing contains the warning.
-    last = assembler.build(
+    b = assembler.build(
         now_sim_time=rt.scheduler.sim_time,
         last_turn_sim_time=rt.scheduler.sim_time,
         sim_time_stalled_for_turns=4,
     )
-    assert "Stall warning" in render_briefing(last)
-
-
-def test_stall_counter_resets_when_sim_time_advances():
-    """A write-cost action resets the stall counter."""
-    s = load_scenario(SMOKE)
-    rt = build_runtime(s)
-    assembler = BriefingAssembler(rt.world, end_sim_time=s.config.end_sim_time)
-    captured: list[int] = []
-
-    calls = [
-        ToolCall(tool="tasks.list", args={}),        # free
-        ToolCall(tool="tasks.list", args={}),        # free
-        ToolCall(tool="tasks.update_status",         # 1 min — advances clock
-                 args={"task_id": "task.SMOKE-1", "status": "In Progress"}),
-        ToolCall(tool="tasks.list", args={}),        # free again
-    ]
-    class Recorder:
-        def __init__(self): self.n = 0
-        def decide(self, briefing):
-            captured.append(briefing.sim_time_stalled_for_turns)
-            c = calls[self.n]; self.n += 1; return c
-
-    driver = AgentDriver(
-        rt.world, rt.scheduler, rt.agent_registry, Recorder(), assembler,
-        DriverConfig(max_turns=4, end_sim_time=s.config.end_sim_time),
+    assert "Stall warning" in render_briefing(b)
+    # Below threshold (3), the warning is absent.
+    b2 = assembler.build(
+        now_sim_time=rt.scheduler.sim_time,
+        last_turn_sim_time=rt.scheduler.sim_time,
+        sim_time_stalled_for_turns=1,
     )
-    driver.run()
-    # 0 at start, 1 after first free read, 2 after second, then 0 after the
-    # write action (sim_time advanced), then 1 after the next free read.
-    assert captured == [0, 1, 2, 0]
+    assert "Stall warning" not in render_briefing(b2)
 
 
 # ---------------------------------------------------------------------------
