@@ -1,0 +1,92 @@
+{
+  "completed": false,
+  "tier_used": "slice_safe",
+  "composite_score": -0.14225352112676057,
+  "metrics": [
+    {
+      "name": "error_rate",
+      "tier": "slice_safe",
+      "normalized": -0.19999999999999996,
+      "raw": 0.24,
+      "detail": {
+        "errors": 24,
+        "total": 100
+      }
+    },
+    {
+      "name": "turns_per_sim_hour",
+      "tier": "slice_safe",
+      "normalized": -1.0,
+      "raw": 96.7741935483871,
+      "detail": {
+        "turns": 100,
+        "sim_time": 62
+      }
+    },
+    {
+      "name": "repeat_read_rate",
+      "tier": "slice_safe",
+      "normalized": -0.295774647887324,
+      "raw": 0.323943661971831,
+      "detail": {
+        "bad_reads": 23,
+        "total_reads": 71
+      }
+    },
+    {
+      "name": "anti_hack_max_messages",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 0.0,
+      "detail": {
+        "sent": 0,
+        "limit": 120
+      }
+    }
+  ],
+  "judge": {
+    "tier": "slice_safe",
+    "axes": {
+      "specificity": {
+        "score": 0.0,
+        "rationale": ""
+      },
+      "decision_hygiene": {
+        "score": -0.5,
+        "rationale": "judge: | artifacts:-1.00"
+      },
+      "risk_escalation": {
+        "score": 0.0,
+        "rationale": ""
+      }
+    },
+    "mean_score": -0.16666666666666666
+  },
+  "artifacts": [
+    {
+      "artifact_id": "ceo_launch_readiness_email",
+      "found": false,
+      "pass_rate": 0.0,
+      "normalized_score": -1.0,
+      "items": []
+    },
+    {
+      "artifact_id": "audit_log_date_decision",
+      "found": false,
+      "pass_rate": 0.0,
+      "normalized_score": -1.0,
+      "items": []
+    },
+    {
+      "artifact_id": "bigcorp_escalation_reply",
+      "found": false,
+      "pass_rate": 0.0,
+      "normalized_score": -1.0,
+      "items": []
+    }
+  ],
+  "notes": [
+    "final_sim_time=62",
+    "end_sim_time=7200"
+  ]
+}

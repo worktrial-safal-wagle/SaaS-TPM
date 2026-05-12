@@ -1,0 +1,67 @@
+{
+  "scenario_id": "smoke",
+  "seed": 0,
+  "scenario_origin_minute_of_week": 540,
+  "agent_id": "person.tpm",
+  "people": [
+    {
+      "id": "person.tpm",
+      "display_name": "TPM",
+      "role": "tpm",
+      "team": "program",
+      "manager_id": null,
+      "is_agent": true,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1020,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 1.0,
+      "persona_notes": "You are the Technical Program Manager. It's your first day. The smoke\nscenario only exists to exercise the wiring — confirm the tool surface\nworks by inspecting the world, moving the smoke task, and reporting back.\n",
+      "knowledge": {}
+    }
+  ],
+  "channels": [
+    {
+      "id": "channel.general",
+      "name": "general",
+      "members": [
+        "person.tpm"
+      ],
+      "is_private": false,
+      "is_dm": false,
+      "topic": "Company-wide chatter."
+    }
+  ],
+  "messages": [],
+  "email_threads": [],
+  "emails": [],
+  "tasks": [
+    {
+      "id": "task.SMOKE-1",
+      "project": "SMOKE",
+      "title": "Confirm tool surface works",
+      "description": "Move this task through the workflow as a wiring sanity check.",
+      "status": "Backlog",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.tpm",
+      "priority": "P2",
+      "estimated_effort_seconds": 600,
+      "remaining_effort_seconds": 600,
+      "deadline_sim_time": null,
+      "depends_on": [],
+      "comments": []
+    }
+  ],
+  "docs": [],
+  "calendar": [],
+  "meeting_transcripts": [],
+  "notifications": []
+}

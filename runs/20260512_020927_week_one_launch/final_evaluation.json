@@ -1,0 +1,506 @@
+{
+  "completed": true,
+  "tier_used": "full",
+  "composite_score": 0.4726342592592593,
+  "metrics": [
+    {
+      "name": "error_rate",
+      "tier": "slice_safe",
+      "normalized": 0.6851851851851852,
+      "raw": 0.06296296296296296,
+      "detail": {
+        "errors": 17,
+        "total": 270,
+        "errors_per_tick": null,
+        "total_ticks": null
+      },
+      "contributes": true
+    },
+    {
+      "name": "prioritization_latency",
+      "tier": "slice_safe",
+      "normalized": 0.3958333333333333,
+      "raw": 0.3958333333333333,
+      "detail": {
+        "items": [
+          {
+            "id": "maya_migration_dm_acked_fast",
+            "status": "acked",
+            "trigger_sim_time": 120,
+            "ack_sim_time": 130,
+            "latency_minutes": 10,
+            "target_latency_minutes": 240.0,
+            "score": 1.0,
+            "within_tick_floor": true
+          },
+          {
+            "id": "bigcorp_escalation_acked_fast",
+            "status": "acked",
+            "trigger_sim_time": 1500,
+            "ack_sim_time": 1504,
+            "latency_minutes": 4,
+            "target_latency_minutes": 120.0,
+            "score": 1.0,
+            "within_tick_floor": true
+          },
+          {
+            "id": "ceo_summary_acked_fast",
+            "status": "acked",
+            "trigger_sim_time": 2910,
+            "ack_sim_time": 3780,
+            "latency_minutes": 870,
+            "target_latency_minutes": 480.0,
+            "score": -0.8125,
+            "within_tick_floor": false
+          }
+        ],
+        "scored": 3,
+        "total_declared": 3
+      },
+      "contributes": true
+    },
+    {
+      "name": "hidden_fact_discovery_rate",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 1.0,
+      "detail": {
+        "items": [
+          {
+            "id": "maya_migration_dm",
+            "status": "read_and_referenced",
+            "score": 1.0,
+            "read_count": 1,
+            "first_read_sim_time": 2164
+          },
+          {
+            "id": "date_field_conflict_in_docs",
+            "status": "read_and_referenced",
+            "score": 1.0,
+            "read_count": 4,
+            "first_read_sim_time": 5
+          }
+        ],
+        "total_declared": 2
+      },
+      "contributes": true
+    },
+    {
+      "name": "follow_up_rate",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 1.0,
+      "detail": {
+        "items": [
+          {
+            "id": "follow_up_kai_on_migration",
+            "npc_id": "person.kai",
+            "status": "replied",
+            "score": 1.0,
+            "first_outbound_sim_time": 131,
+            "deadline_sim_time": 371
+          },
+          {
+            "id": "follow_up_priya_on_audit_format",
+            "npc_id": "person.priya",
+            "status": "replied",
+            "score": 1.0,
+            "first_outbound_sim_time": 10,
+            "deadline_sim_time": 250
+          }
+        ],
+        "scored": 2,
+        "total_declared": 2
+      },
+      "contributes": true
+    },
+    {
+      "name": "opportunity_cost_score",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 1.0,
+      "detail": {
+        "items": [
+          {
+            "id": "maya_migration_dm_acked_fast",
+            "trigger_sim_time": 120,
+            "evaluated_calls": [
+              "chat.dm",
+              "chat.dm",
+              "wait.for_next_event"
+            ],
+            "status": "acked_in_window",
+            "score": 1.0
+          },
+          {
+            "id": "bigcorp_escalation_acked_fast",
+            "trigger_sim_time": 1500,
+            "evaluated_calls": [
+              "email.send",
+              "chat.dm",
+              "wait.for_next_event"
+            ],
+            "status": "acked_in_window",
+            "score": 1.0
+          },
+          {
+            "id": "ceo_summary_acked_fast",
+            "trigger_sim_time": 2910,
+            "evaluated_calls": [
+              "email.send",
+              "tasks.update_status",
+              "tasks.log_work"
+            ],
+            "status": "acked_in_window",
+            "score": 1.0
+          }
+        ],
+        "scored": 3,
+        "total_declared": 3,
+        "lookahead_k": 3
+      },
+      "contributes": true
+    },
+    {
+      "name": "appropriate_abandonments_rate",
+      "tier": "slice_safe",
+      "normalized": -1.0,
+      "raw": -1.0,
+      "detail": {
+        "items": [
+          {
+            "id": "abandon_standup_wed_for_ceo_ask",
+            "during_event": "cal.standup.wed",
+            "window": [
+              2910,
+              2940
+            ],
+            "abandoned": false,
+            "trigger_present": true,
+            "status": "missed_abandon",
+            "score": -1.0
+          }
+        ],
+        "total_declared": 1
+      },
+      "contributes": true
+    },
+    {
+      "name": "bad_timing_starts",
+      "tier": "slice_safe",
+      "normalized": -1.0,
+      "raw": 3.0,
+      "detail": {
+        "violations": [
+          {
+            "tool": "docs.edit",
+            "start": 117,
+            "end": 130,
+            "cost_minutes": 13,
+            "trigger_sim_times": [
+              120
+            ]
+          },
+          {
+            "tool": "meetings.attend",
+            "start": 1441,
+            "end": 1500,
+            "cost_minutes": 59,
+            "trigger_sim_times": [
+              1500
+            ]
+          },
+          {
+            "tool": "meetings.attend",
+            "start": 2354,
+            "end": 2940,
+            "cost_minutes": 586,
+            "trigger_sim_times": [
+              2910
+            ]
+          }
+        ],
+        "count": 3,
+        "long_action_threshold_min": 10
+      },
+      "contributes": true
+    },
+    {
+      "name": "idle_judgment_score",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "reason": "no_idle_calls"
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_forbidden_external_keywords",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "external_recipients": [
+          "person.bigcorp"
+        ],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_must_consult_before_decision",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_forbidden_log_work",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "deadline_hit_rate",
+      "tier": "requires_full_run",
+      "normalized": -0.33333333333333337,
+      "raw": 0.3333333333333333,
+      "detail": {
+        "hits": 3,
+        "total": 9
+      },
+      "contributes": true
+    },
+    {
+      "name": "stakeholder_contact_rate",
+      "tier": "requires_full_run",
+      "normalized": 1.0,
+      "raw": 1.0,
+      "detail": {
+        "hits": 4,
+        "total": 4
+      },
+      "contributes": true
+    }
+  ],
+  "judge": {
+    "tier": "full",
+    "axes": {
+      "specificity": {
+        "score": 0.82,
+        "rationale": "Agent consistently proposed concrete technical decisions (UTC+timezone field, 90-day retention, index fix), assigned owners to tasks with clear deadlines, and tracked specific blockers; occasional vagueness on partner contract timing but generally actionable.",
+        "failed": false,
+        "not_applicable": false
+      },
+      "decision_hygiene": {
+        "score": 0.855,
+        "rationale": "judge:Agent solicited input from stakeholders before committing (asked Morgan for deal scope, Priya for technical constraints, Kai for ownership), but delayed picking up BigCorp escalation by ~4h and did not proactively loop Sam into date-field decision before declaring it made. | artifacts:+1.00",
+        "failed": false,
+        "not_applicable": false
+      },
+      "risk_escalation": {
+        "score": 0.65,
+        "rationale": "Agent surfaced migration timeout risk and BigCorp pipeline issue to leadership (Alex, Dani) in written summaries, but escalated BigCorp to VP-level only after customer re-escalated twice; proactive flagging of index risk to Kai was good, but leadership visibility came late.",
+        "failed": false,
+        "not_applicable": false
+      },
+      "state_accuracy": {
+        "score": -0.62,
+        "rationale": "Agent claims task.PIPE-4 is P1 and actively owned by Kai with urgent deadline pressure, but actual state shows it as Backlog; agent also claims V24-5 migration fix is deploying within ~2h and task.V24-6 is gated on completion, but both remain in earlier workflow stages than claimed.",
+        "failed": false,
+        "not_applicable": false
+      },
+      "pre_emption_judgment": {
+        "score": 0.0,
+        "rationale": "no abandonments in this run",
+        "failed": false,
+        "not_applicable": true
+      },
+      "tick_continuation_judgment": {
+        "score": 0.0,
+        "rationale": "parse_error: unbalanced json | text=```json\n{\n  \"tick_continuation_judgment\": {\n    \"score\": 0.32,\n    \"rationale\": \"Early ticks show strong read-to-action chaining (docs → chat/task updates), but the pattern degrades significantly into",
+        "failed": true,
+        "not_applicable": false
+      },
+      "context_recall_score": {
+        "score": 0.0,
+        "rationale": "parse_error: unbalanced json | text=```json\n{\n  \"context_recall_score\": {\n    \"score\": 0.15,\n    \"rationale\": \"Most claims reference tasks with null state_at_claim and null last_read_sim_time, making verification impossible; where final",
+        "failed": true,
+        "not_applicable": false
+      }
+    },
+    "mean_score": 0.42625
+  },
+  "artifacts": [
+    {
+      "artifact_id": "ceo_launch_readiness_email",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact explicitly names Friday as the launch date and references 'the announced window' for deploy timing in task.V24-6."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact lists migration timeouts as the highest risk, with specific details about Maya's dry-runs showing 1-in-5 timeouts on the events table rewrite due to lock-waits."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "The artifact names Kai as the DRI for rollback (task.V24-7) and describes the rollback plan as staged with invocation criteria and a runbook reference."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact is organized in three paragraphs plus signature, well under the 5-paragraph limit."
+        },
+        {
+          "index": 4,
+          "pass": true,
+          "rationale": "The artifact explicitly states that audit-log scope (read API + 90-day retention + CSV export) is 'held' and does not commit to shipping features beyond what is gated."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "audit_log_date_decision",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact explicitly states the API will return ISO-8601 UTC timestamps plus a `timezone` field on multiple occasions."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact clearly states that customer surfaces (UI and CSV export) will display dates localized to the user's locale, never raw UTC."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "Both Priya and Sam are named and referenced as consulted parties throughout the decision-making process, with Sam owning the rendering contract and Priya owning the API contract."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact includes updated versions of both doc.audit_prd (v2 and v3) and the Audit-log Engineering Spec, reflecting the resolved decision on date-field format."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "bigcorp_escalation_reply",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "Robin specifically acknowledges 'events-endpoint failures since Friday's hotfix' and references the v2.4 migration and workspace_id index issue."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "Robin names Kai (Eng lead) and Maya (validation engineer) as investigators, plus Jordan from Support."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "Robin commits to providing 'a concrete diagnosis + ETA before EOD today' and references the QBR timeline."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    }
+  ],
+  "clusters": {
+    "outcomes_achieved": {
+      "name": "outcomes_achieved",
+      "score": 0.3333333333333333,
+      "included_members": [
+        "deadline_hit_rate",
+        "hidden_fact_discovery_rate"
+      ],
+      "excluded_members": [],
+      "member_count": 2,
+      "contributes_to_composite": true
+    },
+    "decision_quality": {
+      "name": "decision_quality",
+      "score": 0.541,
+      "included_members": [
+        "decision_hygiene",
+        "specificity",
+        "risk_escalation",
+        "state_accuracy",
+        "artifacts_mean"
+      ],
+      "excluded_members": [
+        "anti_hack_must_consult_before_decision",
+        "anti_hack_forbidden_external_keywords",
+        "anti_hack_forbidden_log_work"
+      ],
+      "member_count": 8,
+      "contributes_to_composite": true
+    },
+    "coordination": {
+      "name": "coordination",
+      "score": 1.0,
+      "included_members": [
+        "stakeholder_contact_rate",
+        "follow_up_rate"
+      ],
+      "excluded_members": [],
+      "member_count": 2,
+      "contributes_to_composite": true
+    },
+    "time_management": {
+      "name": "time_management",
+      "score": 0.01620370370370371,
+      "included_members": [
+        "error_rate",
+        "prioritization_latency",
+        "opportunity_cost_score",
+        "appropriate_abandonments_rate",
+        "bad_timing_starts"
+      ],
+      "excluded_members": [
+        "idle_judgment_score",
+        "pre_emption_judgment",
+        "tick_continuation_judgment",
+        "context_recall_score"
+      ],
+      "member_count": 9,
+      "contributes_to_composite": true
+    }
+  },
+  "notes": [
+    "final_sim_time=7200",
+    "end_sim_time=7200"
+  ],
+  "errors": [
+    "axes.tick_continuation_judgment: judge_failed",
+    "axes.context_recall_score: judge_failed"
+  ]
+}

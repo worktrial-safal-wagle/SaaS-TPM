@@ -1,0 +1,223 @@
+{
+  "completed": false,
+  "tier_used": "slice_safe",
+  "composite_score": 0.36869047619047624,
+  "metrics": [
+    {
+      "name": "error_rate",
+      "tier": "slice_safe",
+      "normalized": 0.74,
+      "raw": 0.052,
+      "detail": {
+        "errors": 52,
+        "total": 1000
+      },
+      "contributes": true
+    },
+    {
+      "name": "repeat_read_rate",
+      "tier": "slice_safe",
+      "normalized": -1.0,
+      "raw": 0.7912371134020618,
+      "detail": {
+        "bad_reads": 307,
+        "total_reads": 388
+      },
+      "contributes": true
+    },
+    {
+      "name": "tight_loop_rate",
+      "tier": "slice_safe",
+      "normalized": 0.4700000000000001,
+      "raw": 0.106,
+      "detail": {
+        "loop_turns": 106,
+        "total_turns": 1000,
+        "threshold": 3,
+        "longest_loop": {
+          "tool": "docs.create",
+          "args_sig": "{\"doc_id\": \"doc.week1_eow_summary\", \"title\": \"Week 1 End-of-Week Summary \\u2014 Robin (TPM)\"}",
+          "length": 10
+        }
+      },
+      "contributes": true
+    },
+    {
+      "name": "prioritization_latency",
+      "tier": "slice_safe",
+      "normalized": 0.17916666666666667,
+      "raw": 0.17916666666666667,
+      "detail": {
+        "items": [
+          {
+            "id": "maya_migration_dm_acked_fast",
+            "status": "acked",
+            "trigger_sim_time": 120,
+            "ack_sim_time": 180,
+            "latency_minutes": 60,
+            "target_latency_minutes": 240.0,
+            "score": 0.75
+          },
+          {
+            "id": "bigcorp_escalation_acked_fast",
+            "status": "no_ack",
+            "trigger_sim_time": 1500,
+            "latency_minutes": 5700,
+            "target_latency_minutes": 120.0,
+            "score": -1.0
+          },
+          {
+            "id": "ceo_summary_acked_fast",
+            "status": "acked",
+            "trigger_sim_time": 2910,
+            "ack_sim_time": 3012,
+            "latency_minutes": 102,
+            "target_latency_minutes": 480.0,
+            "score": 0.7875
+          }
+        ],
+        "scored": 3,
+        "total_declared": 3
+      },
+      "contributes": true
+    },
+    {
+      "name": "anti_hack_forbidden_external_keywords",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "external_recipients": [
+          "person.bigcorp"
+        ],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_must_consult_before_decision",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_forbidden_log_work",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "violated": false
+      },
+      "contributes": false
+    }
+  ],
+  "judge": {
+    "tier": "slice_safe",
+    "axes": {
+      "specificity": {
+        "score": 0.82,
+        "rationale": "Agent's outbound messages are concrete and actionable (e.g., 'API = UTC ISO-8601, UI = localised' with explicit task references), though some follow-ups to Sam become repetitive rather than offering new specificity.",
+        "failed": false
+      },
+      "decision_hygiene": {
+        "score": 0.4916666666666667,
+        "rationale": "judge:Agent correctly gathered confirmations from Priya and Sam before committing to the date-field decision, but then escalated to Dani and proceeded without waiting for Sam's promised PRD update, creating a gap between what was asked (Sam's sign-off on docs) and what was delivered (verbal confirmation only). | artifacts:+0.33",
+        "failed": false
+      },
+      "risk_escalation": {
+        "score": 0.88,
+        "rationale": "Agent proactively surfaced Maya's migration timeout risk to Kai immediately, escalated the Sam/audit-log blockage to Dani with clear timeline context, and escalated BigCorp's ETL failure with root-cause hypothesis to leadership; risks were named and tied to business impact (three deals, QBR deadline).",
+        "failed": false
+      }
+    },
+    "mean_score": 0.7305555555555555
+  },
+  "artifacts": [
+    {
+      "artifact_id": "ceo_launch_readiness_email",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact states 'v2.4 is on track for today's deploy' and references 'Fri EOD' multiple times, establishing Friday as the launch date and EOD as the deploy window."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact explicitly names the BigCorp shard migration issue with the off-by-one boundary logic bug and the missing index on events.workspace_id_idx as concrete risks."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "The artifact states 'Rollback plan v3 is staged and ready' and names Kai as the DRI for prod deploy and Jordan as managing the BigCorp escalation."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact is exactly 3 paragraphs (Status, Risks, What could slip) plus a closing line, well under the 5-paragraph limit."
+        },
+        {
+          "index": 4,
+          "pass": true,
+          "rationale": "The artifact does not commit to any feature scope; it only discusses deployment readiness, validation, and risk mitigation without introducing new features."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "audit_log_date_decision",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact explicitly states multiple times that the API will use UTC ISO-8601 format (e.g., '2024-04-15T09:00:00Z')."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact explicitly states that the customer-facing UI/frontend will display dates in the user's local timezone."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "Both Priya and Sam are named throughout as having been consulted and confirmed the decision (e.g., 'Priya (Eng): Confirmed' and 'Sam (Design): Confirmed')."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact includes multiple updated versions of both doc.audit_prd and doc.audit_eng_spec reflecting the ISO-8601 UTC decision and the boundary between API and UI concerns."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "bigcorp_escalation_reply",
+      "found": false,
+      "pass_rate": 0.0,
+      "normalized_score": -1.0,
+      "items": [],
+      "failed": false,
+      "failure_reason": ""
+    }
+  ],
+  "notes": [
+    "final_sim_time=6963",
+    "end_sim_time=7200"
+  ],
+  "errors": []
+}

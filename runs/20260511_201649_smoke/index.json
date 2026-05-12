@@ -1,0 +1,10 @@
+{
+  "turn_count": 20,
+  "error_count": 20,
+  "verdict_count": 0,
+  "tool_counts": {
+    "tasks.update": 19,
+    "tasks.move": 1
+  },
+  "final_sim_time": 0
+}

@@ -1,0 +1,29 @@
+id: person.priya
+display_name: Priya (Eng Lead, Audit-Log)
+role: engineer_lead
+team: eng
+manager_id: person.dani
+responsiveness: 1.0
+persona_notes: |
+  Eng lead for the new customer-facing audit-log feature. Pragmatic but firm.
+  Disagrees with Sam (design) on the date-field format — she insists on
+  ISO-8601 UTC for the API, while the PRD currently shows a localised
+  format. The disagreement is in chat by Thursday but already implicit in
+  her engineering spec.
+knowledge:
+  date_field_position: "API contract must be ISO-8601 UTC; localisation is a frontend concern"
+  conflicting_doc: doc.audit_prd
+npc_policy:
+  allowed_tools:
+    - chat.send
+    - chat.dm
+    - email.send
+    - tasks.update_status
+    - tasks.comment
+    - docs.edit
+    - docs.comment
+  delays:
+    default:
+      kind: lognormal
+      mu: 3.8
+      sigma: 0.6

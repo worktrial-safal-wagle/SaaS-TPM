@@ -1,0 +1,223 @@
+# 40 seeded chat messages distributed across the four channels, with sim_time
+# spread across the Friday-before through Monday morning so the agent has
+# real history to read. (Negative sim_time isn't supported, so all messages
+# land at sim_time=0..15 — anchored as "the recent past" from Robin's POV.)
+messages:
+  # --- channel.general ---
+  - id: msg.general.1
+    channel_id: channel.general
+    sender_id: person.dani
+    body: "Welcome to Lumen, Robin (@person.tpm)! v2.4 is shipping this week so it's a fast onboarding."
+    sim_time: 0
+    mentions: [person.tpm]
+  - id: msg.general.2
+    channel_id: channel.general
+    sender_id: person.alex
+    body: "👋 New TPM joining today. v2.4 launch is the priority. Talk to me if anything blocks shipping."
+    sim_time: 1
+  - id: msg.general.3
+    channel_id: channel.general
+    sender_id: person.morgan
+    body: "Reminder: three closed-won deals are gated on audit-log shipping in v2.4. No slippage please."
+    sim_time: 2
+
+  # --- channel.eng ---
+  - id: msg.eng.1
+    channel_id: channel.eng
+    sender_id: person.kai
+    body: "v2.4 RC is in soak. Migration dry-runs over the weekend. I'm cutting the release branch Mon AM."
+    sim_time: 0
+  - id: msg.eng.2
+    channel_id: channel.eng
+    sender_id: person.maya
+    body: "Was running the migration dry-run again this weekend. Most pass clean. Couple timed out."
+    sim_time: 1
+  - id: msg.eng.3
+    channel_id: channel.eng
+    sender_id: person.kai
+    body: "@person.maya which ones? if it's the events table again that's been flaky for a year"
+    sim_time: 2
+    mentions: [person.maya]
+  - id: msg.eng.4
+    channel_id: channel.eng
+    sender_id: person.maya
+    body: "yeah, events. ~1 in 5. I'll keep poking at it."
+    sim_time: 3
+  - id: msg.eng.5
+    channel_id: channel.eng
+    sender_id: person.priya
+    body: "Audit-log scaffolding merged. Spec doc updated; comments welcome."
+    sim_time: 4
+  - id: msg.eng.6
+    channel_id: channel.eng
+    sender_id: person.dani
+    body: "Folks, please keep status on the v24 board updated daily this week."
+    sim_time: 5
+  - id: msg.eng.7
+    channel_id: channel.eng
+    sender_id: person.kai
+    body: "Will do. RC cut should be unblocked once smoke tests are green."
+    sim_time: 6
+  - id: msg.eng.8
+    channel_id: channel.eng
+    sender_id: person.priya
+    body: "FYI Sam and I are still aligning on the date field for the API. Will sort it this week."
+    sim_time: 7
+
+  # --- channel.launch-v24 ---
+  - id: msg.v24.1
+    channel_id: channel.launch-v24
+    sender_id: person.kai
+    body: "Launch readiness review on the calendar for Wed 14:00 — full attendance please."
+    sim_time: 0
+  - id: msg.v24.2
+    channel_id: channel.launch-v24
+    sender_id: person.morgan
+    body: "I'll need a customer-facing changelog blurb by Thursday EOD to brief AEs."
+    sim_time: 1
+  - id: msg.v24.3
+    channel_id: channel.launch-v24
+    sender_id: person.jordan
+    body: "Support's standing by. Runbook v3 reviewed and merged."
+    sim_time: 2
+  - id: msg.v24.4
+    channel_id: channel.launch-v24
+    sender_id: person.dani
+    body: "Robin will be coordinating from here on. Loop them in on everything."
+    sim_time: 3
+  - id: msg.v24.5
+    channel_id: channel.launch-v24
+    sender_id: person.kai
+    body: "Migration plan v3 is in the runbook. Pre-mortem doc is open in #engineering."
+    sim_time: 4
+  - id: msg.v24.6
+    channel_id: channel.launch-v24
+    sender_id: person.kai
+    body: "Reminder we're freezing non-critical merges Wed 18:00. Audit-log work continues, but no new v24 features."
+    sim_time: 5
+  - id: msg.v24.7
+    channel_id: channel.launch-v24
+    sender_id: person.jordan
+    body: "Couple of customers asking when v2.4 actually ships. Same answer: Friday EOD pending green smoke."
+    sim_time: 6
+  - id: msg.v24.8
+    channel_id: channel.launch-v24
+    sender_id: person.morgan
+    body: "👍 holding the line."
+    sim_time: 7
+  - id: msg.v24.9
+    channel_id: channel.launch-v24
+    sender_id: person.maya
+    body: "I'll have an update on the migration dry-runs by Tue."
+    sim_time: 8
+
+  # --- channel.audit-log ---
+  - id: msg.audit.1
+    channel_id: channel.audit-log
+    sender_id: person.priya
+    body: "Audit-log PRD merged. Engineering spec posted. Linked in #engineering."
+    sim_time: 0
+  - id: msg.audit.2
+    channel_id: channel.audit-log
+    sender_id: person.sam
+    body: "Mocks finalised; I'll attach Figma when I'm at my desk."
+    sim_time: 1
+  - id: msg.audit.3
+    channel_id: channel.audit-log
+    sender_id: person.priya
+    body: "@person.sam quick callout: PRD shows localised dates on the API, eng spec has UTC ISO-8601. We need one answer. I'll raise this week."
+    sim_time: 2
+    mentions: [person.sam]
+  - id: msg.audit.4
+    channel_id: channel.audit-log
+    sender_id: person.sam
+    body: "Customers see localised. API is implementation detail — we can hide the rest."
+    sim_time: 3
+  - id: msg.audit.5
+    channel_id: channel.audit-log
+    sender_id: person.priya
+    body: "API is not an implementation detail when partners are integrating. Anyway — let's discuss this week with a decision-maker."
+    sim_time: 4
+  - id: msg.audit.6
+    channel_id: channel.audit-log
+    sender_id: person.dani
+    body: "Park this until a PM is in the loop. Robin's starting Mon."
+    sim_time: 5
+  - id: msg.audit.7
+    channel_id: channel.audit-log
+    sender_id: person.morgan
+    body: "FYI I've promised the audit-log capability to three accounts in Q2 closes."
+    sim_time: 6
+  - id: msg.audit.8
+    channel_id: channel.audit-log
+    sender_id: person.priya
+    body: "Backend scaffolding green. QA pass blocked on the date-field decision."
+    sim_time: 7
+  - id: msg.audit.9
+    channel_id: channel.audit-log
+    sender_id: person.sam
+    body: "Same — frontend rendering pending the call."
+    sim_time: 8
+
+  # --- a couple of bits in eng channel about ongoing work ---
+  - id: msg.eng.9
+    channel_id: channel.eng
+    sender_id: person.dani
+    body: "@person.tpm — please run morning standups in #engineering starting tomorrow. Async if folks prefer."
+    sim_time: 12
+    mentions: [person.tpm]
+  - id: msg.eng.10
+    channel_id: channel.eng
+    sender_id: person.kai
+    body: "Migration plan PR up for review. PTAL @person.priya."
+    sim_time: 13
+    mentions: [person.priya]
+  - id: msg.eng.11
+    channel_id: channel.eng
+    sender_id: person.priya
+    body: "On it after the audit-log review."
+    sim_time: 14
+  - id: msg.eng.12
+    channel_id: channel.eng
+    sender_id: person.maya
+    body: "TPM onboarding doc updated with the latest team contacts."
+    sim_time: 15
+
+  # --- a couple in launch-v24 ---
+  - id: msg.v24.10
+    channel_id: channel.launch-v24
+    sender_id: person.dani
+    body: "Tracking risk register on the launch-readiness doc."
+    sim_time: 12
+  - id: msg.v24.11
+    channel_id: channel.launch-v24
+    sender_id: person.kai
+    body: "I want the launch-readiness summary Wed EOD. Whoever's TPM."
+    sim_time: 13
+  - id: msg.v24.12
+    channel_id: channel.launch-v24
+    sender_id: person.jordan
+    body: "Setting up tomorrow's support coverage rota."
+    sim_time: 14
+
+  # --- a couple in general ---
+  - id: msg.general.4
+    channel_id: channel.general
+    sender_id: person.priya
+    body: "Welcome Robin! Holler if you want a coffee chat re: audit-log."
+    sim_time: 11
+  - id: msg.general.5
+    channel_id: channel.general
+    sender_id: person.jordan
+    body: "Customer-success huddle this Thursday 11am — feel free to drop in."
+    sim_time: 12
+  - id: msg.general.6
+    channel_id: channel.general
+    sender_id: person.dani
+    body: "FYI quarterly all-hands on Friday at 16:00. Robin you don't have to present this week."
+    sim_time: 13
+  - id: msg.general.7
+    channel_id: channel.general
+    sender_id: person.sam
+    body: "Reminder: design-eng sync Thursday 14:00."
+    sim_time: 14

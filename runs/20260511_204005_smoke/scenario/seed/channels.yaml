@@ -1,0 +1,5 @@
+channels:
+  - id: channel.general
+    name: general
+    members: [person.tpm]
+    topic: "Company-wide chatter."

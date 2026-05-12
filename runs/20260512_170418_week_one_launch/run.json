@@ -1,0 +1,8 @@
+{
+  "scenario_id": "week_one_launch",
+  "seed": 7,
+  "end_sim_time": 7200,
+  "agent_id": "person.tpm",
+  "status": "completed",
+  "completed_at": "2026-05-12T17:41:33.039947+00:00"
+}

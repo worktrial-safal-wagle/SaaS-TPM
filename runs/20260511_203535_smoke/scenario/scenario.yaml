@@ -1,0 +1,8 @@
+id: smoke
+seed: 0
+agent_id: person.tpm
+start:
+  weekday: 0
+  time: "09:00"
+end_sim_time: 480
+description: "Wiring sanity check — one person, one channel, one task. No NPCs."

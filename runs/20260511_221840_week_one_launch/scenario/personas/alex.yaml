@@ -1,0 +1,22 @@
+id: person.alex
+display_name: Alex (CEO)
+role: ceo
+team: exec
+responsiveness: 0.3
+persona_notes: |
+  CEO. Will email mid-week asking for a concise launch-readiness summary by
+  end of day. Wants clarity, risk visibility, and a written plan — not a
+  hand-wave. Expects a 4-hour SLA on direct asks.
+knowledge:
+  expects_summary: "Wednesday EOD"
+  sla_ceo_direct: "4 hours"
+npc_policy:
+  allowed_tools:
+    - chat.send
+    - chat.dm
+    - email.send
+  delays:
+    default:
+      kind: lognormal
+      mu: 3.2
+      sigma: 0.4

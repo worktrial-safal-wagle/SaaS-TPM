@@ -1,0 +1,33 @@
+{
+  "turn_count": 250,
+  "error_count": 149,
+  "verdict_count": 0,
+  "tool_counts": {
+    "docs.read": 4,
+    "chat.list": 2,
+    "chat.read": 14,
+    "chat.send": 5,
+    "tasks.update_status": 7,
+    "tasks.comment": 6,
+    "tasks.list": 3,
+    "chat.mark_read": 3,
+    "chat.dm": 10,
+    "email.read": 12,
+    "email.send": 3,
+    "meetings.attend": 141,
+    "calendar.create": 4,
+    "notifications.list": 12,
+    "calendar.rsvp": 1,
+    "notifications.mark_read": 5,
+    "wait.for_next_event": 5,
+    "tasks.create": 1,
+    "tasks.assign": 1,
+    "tasks.add_dependency": 1,
+    "email.list": 3,
+    "wait.until": 2,
+    "meetings.get_transcript": 1,
+    "docs.edit": 2,
+    "tasks.log_work": 2
+  },
+  "final_sim_time": 900
+}

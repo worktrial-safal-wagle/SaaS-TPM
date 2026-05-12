@@ -1,0 +1,8 @@
+{
+  "scenario_id": "smoke",
+  "seed": 0,
+  "end_sim_time": 480,
+  "agent_id": "person.tpm",
+  "status": "completed",
+  "completed_at": "2026-05-11T20:36:08.850262+00:00"
+}

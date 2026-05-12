@@ -1,0 +1,4 @@
+{"kind": "task_status_changed", "payload": {"task_id": "task.SMOKE-1", "from": "Backlog", "to": "In Progress"}}
+{"kind": "task_work_logged", "payload": {"task_id": "task.SMOKE-1", "seconds": 600, "remaining_effort_seconds": 0}}
+{"kind": "task_status_changed", "payload": {"task_id": "task.SMOKE-1", "from": "In Progress", "to": "Done"}}
+{"kind": "message_inserted", "payload": {"message_id": "msg.channel.general.1", "channel_id": "channel.general", "sender_id": "person.tpm", "mentions": [], "sim_time": 12}}

@@ -1,0 +1,45 @@
+channels:
+  - id: channel.general
+    name: general
+    topic: "Company-wide announcements."
+    members:
+      - person.tpm
+      - person.dani
+      - person.maya
+      - person.kai
+      - person.priya
+      - person.sam
+      - person.jordan
+      - person.alex
+      - person.morgan
+
+  - id: channel.eng
+    name: engineering
+    topic: "Eng team standups, technical chatter."
+    members:
+      - person.tpm
+      - person.dani
+      - person.maya
+      - person.kai
+      - person.priya
+
+  - id: channel.launch-v24
+    name: launch-v24
+    topic: "All things v2.4 launch."
+    members:
+      - person.tpm
+      - person.dani
+      - person.kai
+      - person.maya
+      - person.jordan
+      - person.morgan
+
+  - id: channel.audit-log
+    name: audit-log
+    topic: "Audit-log feature work."
+    members:
+      - person.tpm
+      - person.priya
+      - person.sam
+      - person.dani
+      - person.morgan
