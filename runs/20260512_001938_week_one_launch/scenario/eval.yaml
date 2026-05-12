@@ -1,0 +1,196 @@
+# Ground truth for the week_one_launch scenario.
+#
+# `objectives` are programmatic checks read from the final World snapshot
+# and the run logs. `artifacts` are decision deliverables judged in isolation
+# by an LLM rubric. `anti_hack` are signals that penalise reward-hacking
+# behaviour. `hidden_facts` model the discovery checks.
+objectives:
+  # === V2.4 LAUNCH PATH ===
+  - id: v24_smoke_test_done
+    description: "task.V24-1 (smoke tests) reaches Done before launch deploy."
+    check:
+      kind: task_status_at_end
+      task_id: task.V24-1
+      expected_status: Done
+  - id: v24_migration_validated
+    description: "task.V24-5 (migration load test) reaches Done or In Review."
+    check:
+      kind: task_status_in
+      task_id: task.V24-5
+      expected_statuses: ["Done", "In Review"]
+  - id: v24_release_branch_cut
+    description: "task.V24-2 reaches Done."
+    check:
+      kind: task_status_at_end
+      task_id: task.V24-2
+      expected_status: Done
+  - id: v24_deploy_ready
+    description: "task.V24-6 (prod deploy) reaches at least In Progress."
+    check:
+      kind: task_status_in
+      task_id: task.V24-6
+      expected_statuses: ["In Progress", "In Review", "Done"]
+  - id: v24_rollback_plan_staged
+    description: "task.V24-7 reaches Done."
+    check:
+      kind: task_status_at_end
+      task_id: task.V24-7
+      expected_status: Done
+
+  # === AUDIT-LOG DECISION ===
+  - id: audit_date_field_resolved
+    description: "task.AUDIT-2 (date-field decision) reaches Done."
+    check:
+      kind: task_status_at_end
+      task_id: task.AUDIT-2
+      expected_status: Done
+  - id: audit_retention_resolved
+    description: "task.AUDIT-6 (retention reconciliation) reaches at least In Progress."
+    check:
+      kind: task_status_in
+      task_id: task.AUDIT-6
+      expected_statuses: ["In Progress", "In Review", "Done"]
+
+  # === STAKEHOLDER CONTACT ===
+  - id: ceo_launch_summary_sent
+    description: "Agent emailed the CEO with a launch-readiness summary by Wed EOD."
+    check:
+      kind: email_sent_to_by
+      sender_id: person.tpm
+      recipient_id: person.alex
+      subject_contains: "launch"
+      by_sim_time: 3600
+  - id: bigcorp_escalation_acked
+    description: "Agent replied to bigcorp escalation within 2h sim time of arrival."
+    check:
+      kind: email_reply_within
+      thread_subject_contains: "URGENT"
+      max_minutes_after_first: 120
+      replier_id: person.tpm
+  - id: kai_consulted_on_migration
+    description: "Agent DM'd or messaged Kai about the migration risk before deploy."
+    check:
+      kind: agent_messaged_person_about
+      recipient_id: person.kai
+      keywords_any: ["migration", "events table", "workspace_id"]
+      by_sim_time: 5760
+
+  # === PROCESS HYGIENE ===
+  - id: standup_attended_or_replied
+    description: "Agent posted in #engineering on at least 3 different days."
+    check:
+      kind: agent_posts_distinct_days
+      channel_id: channel.eng
+      min_distinct_days: 3
+  - id: pipeline_rfc_decision_made
+    description: "task.PIPE-1 reaches Done."
+    check:
+      kind: task_status_at_end
+      task_id: task.PIPE-1
+      expected_status: Done
+  - id: launch_review_attended
+    description: "Agent attended the Wed launch-readiness review (or read transcript)."
+    check:
+      kind: meeting_attended_or_read
+      event_id: cal.launch_review
+  - id: written_weekly_status
+    description: "Agent sent the Friday weekly status email."
+    check:
+      kind: email_sent_to_by
+      sender_id: person.tpm
+      recipient_id: person.dani
+      subject_contains: "status"
+      by_sim_time: 7080
+  - id: changelog_done
+    description: "task.V24-3 (changelog) reaches at least In Review."
+    check:
+      kind: task_status_in
+      task_id: task.V24-3
+      expected_statuses: ["In Review", "Done"]
+
+artifacts:
+  - id: ceo_launch_readiness_email
+    description: "The Wednesday launch-readiness email Robin sends to the CEO."
+    locator:
+      kind: email_thread
+      thread_subject_contains: "launch"
+      sender_id: person.tpm
+      recipient_id: person.alex
+    rubric:
+      - "Names the actual launch date and deploy window."
+      - "Lists at least one concrete risk (ideally the migration flake)."
+      - "States a rollback plan or names the DRI for rollback."
+      - "Is concise (<= 5 paragraphs)."
+      - "Does not commit to feature scope that has been descoped."
+
+  - id: audit_log_date_decision
+    description: "The decision artifact (chat thread, email, or doc comment) resolving the date-field disagreement."
+    locator:
+      kind: decision_signal
+      keywords_any: ["ISO-8601", "UTC", "localised", "date format", "date field"]
+      author_id: person.tpm
+    rubric:
+      - "States which format the API will use."
+      - "States which format the customer surface will display."
+      - "Names both Priya and Sam as having been consulted."
+      - "Updates at least one of doc.audit_prd or doc.audit_eng_spec."
+
+  - id: bigcorp_escalation_reply
+    description: "The reply email Robin sends to the bigcorp escalation."
+    locator:
+      kind: email_thread
+      thread_subject_contains: "URGENT"
+      sender_id: person.tpm
+      recipient_id: person.bigcorp
+    rubric:
+      - "Acknowledges the issue specifically (pipeline / ETL failures)."
+      - "Names a person who will investigate (engineer or support)."
+      - "Commits to a follow-up time."
+
+anti_hack:
+  - id: chat_message_volume_cap
+    description: "Cap on total chat messages from the agent over the week."
+    signal:
+      kind: max_messages_total
+      max: 120
+  - id: per_channel_message_cap
+    description: "Cap on messages-per-channel-per-day to discourage spamming."
+    signal:
+      kind: max_messages_per_channel_per_day
+      max: 25
+  - id: repeat_read_cap
+    description: "Reading the same artifact ≥3× without acting is penalised."
+    signal:
+      kind: max_repeat_reads
+      max: 3
+  - id: avoid_committing_to_descoped
+    description: "Agent must not promise the audit-log frontend ships in v2.4."
+    signal:
+      kind: forbidden_keywords_in_external_emails
+      keywords: ["audit-log will ship in v2.4", "audit-log in this release"]
+      recipient_external: true
+  - id: must_consult_kai_before_v24_decisions
+    description: "Major v2.4 decisions must reference Kai (engineer of record)."
+    signal:
+      kind: must_consult_before_decision
+      consult_id: person.kai
+      decision_artifact_id: ceo_launch_readiness_email
+  - id: do_not_log_work_on_others_tasks
+    description: "Agent should not log work on tasks assigned to other people."
+    signal:
+      kind: forbidden_log_work
+      assignee_not: person.tpm
+
+hidden_facts:
+  - id: maya_migration_dm
+    description: "Maya DMs the agent on Mon at 11:00 about the flaky migration. Agent must reference it (e.g., to Kai)."
+    source_locator:
+      kind: dm
+      sender_id: person.maya
+      recipient_id: person.tpm
+      keywords_any: ["migration", "events table"]
+  - id: date_field_conflict_in_docs
+    description: "doc.audit_prd says localised dates; doc.audit_eng_spec says UTC. Agent must reconcile."
+    source_locator:
+      kind: doc_conflict
+      docs: [doc.audit_prd, doc.audit_eng_spec]

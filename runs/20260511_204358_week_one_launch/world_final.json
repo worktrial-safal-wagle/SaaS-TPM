@@ -1,0 +1,1744 @@
+{
+  "scenario_id": "week_one_launch",
+  "seed": 7,
+  "scenario_origin_minute_of_week": 540,
+  "agent_id": "person.tpm",
+  "people": [
+    {
+      "id": "person.alex",
+      "display_name": "Alex (CEO)",
+      "role": "ceo",
+      "team": "exec",
+      "manager_id": null,
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 0.3,
+      "persona_notes": "CEO. Will email mid-week asking for a concise launch-readiness summary by\nend of day. Wants clarity, risk visibility, and a written plan — not a\nhand-wave. Expects a 4-hour SLA on direct asks.\n",
+      "knowledge": {
+        "expects_summary": "Wednesday EOD",
+        "sla_ceo_direct": "4 hours"
+      }
+    },
+    {
+      "id": "person.bigcorp",
+      "display_name": "Casey @ BigCorp (Customer)",
+      "role": "customer_contact",
+      "team": "external",
+      "manager_id": null,
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 0.5,
+      "persona_notes": "External customer at BigCorp Analytics. Escalates an outage on Tuesday\nmorning over email. Expects a PM acknowledgement within 2 hours and a\nstatus update within the day. NOT a directory member the agent typically\nreaches out to; treat as an external participant.\n",
+      "knowledge": {}
+    },
+    {
+      "id": "person.dani",
+      "display_name": "Dani (VP Eng)",
+      "role": "vp_eng",
+      "team": "eng",
+      "manager_id": null,
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 0.4,
+      "persona_notes": "VP of Engineering, sharp and direct. Has been waiting for a TPM for two\nquarters. Wants weekly written launch status. Hates surprises. Will push\nback if you commit to dates without consulting the implementing engineers.\n",
+      "knowledge": {
+        "v24_launch_target": "Friday EOD per the QBR",
+        "audit_log_priority": "secondary; do not let it consume v24 attention"
+      }
+    },
+    {
+      "id": "person.jordan",
+      "display_name": "Jordan (Support Lead)",
+      "role": "support_lead",
+      "team": "support",
+      "manager_id": null,
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 0.7,
+      "persona_notes": "Customer Support lead. Will flag customer escalations early and expects\na 2-hour SLA on PM response when she escalates one. Sends a short note\nto chat when something heats up.\n",
+      "knowledge": {
+        "sla_pm_response": "2 hours"
+      }
+    },
+    {
+      "id": "person.kai",
+      "display_name": "Kai (Senior Backend Eng)",
+      "role": "engineer",
+      "team": "eng",
+      "manager_id": "person.dani",
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 0.8,
+      "persona_notes": "Senior backend engineer, owns the v2.4 launch. Terse. Will only escalate\nblockers when he's sure. Will trust Maya's signal if a TPM raises it but\nwon't go hunting for it on his own.\n",
+      "knowledge": {
+        "v24_owner": "I'm the engineer of record for v2.4"
+      }
+    },
+    {
+      "id": "person.maya",
+      "display_name": "Maya (Junior Backend Eng)",
+      "role": "engineer",
+      "team": "eng",
+      "manager_id": "person.kai",
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 2.5,
+      "persona_notes": "Junior backend engineer, 6 months in. Diligent and a little anxious. Has\nbeen running migration dry-runs all weekend and noticed the v24 prod\nmigration intermittently times out under load. She mentioned this to\nRobin (the new TPM) in a brief DM on Monday morning but is too unsure to\nraise it widely. If asked directly, she'll share the details.\n",
+      "knowledge": {
+        "flaky_migration": "The v24 production migration intermittently times out under concurrent\nwrite load. Reproduces ~1 in 5 dry-runs. Root cause likely missing\nindex on events.workspace_id_idx during the table-rewrite pass. Needs\ndiscussion with Kai before deploy.\n",
+        "affected_task": "task.V24-5"
+      }
+    },
+    {
+      "id": "person.morgan",
+      "display_name": "Morgan (Sales Lead)",
+      "role": "sales_lead",
+      "team": "sales",
+      "manager_id": null,
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 0.9,
+      "persona_notes": "Sales lead. Cares about whether v2.4 ships on time because three deals\nare gated on the new audit-log feature. Will push back if the audit-log\nscope slips.\n",
+      "knowledge": {}
+    },
+    {
+      "id": "person.priya",
+      "display_name": "Priya (Eng Lead, Audit-Log)",
+      "role": "engineer_lead",
+      "team": "eng",
+      "manager_id": "person.dani",
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 1.0,
+      "persona_notes": "Eng lead for the new customer-facing audit-log feature. Pragmatic but firm.\nDisagrees with Sam (design) on the date-field format — she insists on\nISO-8601 UTC for the API, while the PRD currently shows a localised\nformat. The disagreement is in chat by Thursday but already implicit in\nher engineering spec.\n",
+      "knowledge": {
+        "date_field_position": "API contract must be ISO-8601 UTC; localisation is a frontend concern",
+        "conflicting_doc": "doc.audit_prd"
+      }
+    },
+    {
+      "id": "person.sam",
+      "display_name": "Sam (Designer, Audit-Log)",
+      "role": "designer",
+      "team": "design",
+      "manager_id": null,
+      "is_agent": false,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 1.2,
+      "persona_notes": "Product designer on the audit-log feature. Holds that customer-facing\nsurfaces should display dates in the user's local time and the API\nshould match. The current PRD reflects his position. Will not yield\nunless an explicit decision is documented.\n",
+      "knowledge": {
+        "date_field_position": "Surface and API must show localised dates; ISO-8601 is jargon to customers",
+        "conflicting_doc": "doc.audit_eng_spec"
+      }
+    },
+    {
+      "id": "person.tpm",
+      "display_name": "Robin (TPM)",
+      "role": "tpm",
+      "team": "program",
+      "manager_id": null,
+      "is_agent": true,
+      "timezone_offset_minutes": 0,
+      "working_hours": {
+        "start_minute": 540,
+        "end_minute": 1080,
+        "weekdays": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      "responsiveness": 1.0,
+      "persona_notes": "You are Robin, the new Technical Program Manager at Lumen Analytics. It is\nyour first week. You report to Dani (VP Eng). v2.4 ships Friday — that is\nyour primary project. The audit-log feature is just kicking off; the data-\npipeline refactor is peripheral but still your responsibility. Your job is\nto discover blockers, resolve conflicts, prioritise tradeoffs, and keep\nprojects moving.\n",
+      "knowledge": {}
+    }
+  ],
+  "channels": [
+    {
+      "id": "channel.audit-log",
+      "name": "audit-log",
+      "members": [
+        "person.tpm",
+        "person.priya",
+        "person.sam",
+        "person.dani",
+        "person.morgan"
+      ],
+      "is_private": false,
+      "is_dm": false,
+      "topic": "Audit-log feature work."
+    },
+    {
+      "id": "channel.eng",
+      "name": "engineering",
+      "members": [
+        "person.tpm",
+        "person.dani",
+        "person.maya",
+        "person.kai",
+        "person.priya"
+      ],
+      "is_private": false,
+      "is_dm": false,
+      "topic": "Eng team standups, technical chatter."
+    },
+    {
+      "id": "channel.general",
+      "name": "general",
+      "members": [
+        "person.tpm",
+        "person.dani",
+        "person.maya",
+        "person.kai",
+        "person.priya",
+        "person.sam",
+        "person.jordan",
+        "person.alex",
+        "person.morgan"
+      ],
+      "is_private": false,
+      "is_dm": false,
+      "topic": "Company-wide announcements."
+    },
+    {
+      "id": "channel.launch-v24",
+      "name": "launch-v24",
+      "members": [
+        "person.tpm",
+        "person.dani",
+        "person.kai",
+        "person.maya",
+        "person.jordan",
+        "person.morgan"
+      ],
+      "is_private": false,
+      "is_dm": false,
+      "topic": "All things v2.4 launch."
+    }
+  ],
+  "messages": [
+    {
+      "id": "msg.audit.1",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.priya",
+      "body": "Audit-log PRD merged. Engineering spec posted. Linked in #engineering.",
+      "sim_time": 0,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.1",
+      "channel_id": "channel.eng",
+      "sender_id": "person.kai",
+      "body": "v2.4 RC is in soak. Migration dry-runs over the weekend. I'm cutting the release branch Mon AM.",
+      "sim_time": 0,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.general.1",
+      "channel_id": "channel.general",
+      "sender_id": "person.dani",
+      "body": "Welcome to Lumen, Robin (@person.tpm)! v2.4 is shipping this week so it's a fast onboarding.",
+      "sim_time": 0,
+      "thread_root_id": null,
+      "mentions": [
+        "person.tpm"
+      ],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.1",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.kai",
+      "body": "Launch readiness review on the calendar for Wed 14:00 — full attendance please.",
+      "sim_time": 0,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.audit.2",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.sam",
+      "body": "Mocks finalised; I'll attach Figma when I'm at my desk.",
+      "sim_time": 1,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.2",
+      "channel_id": "channel.eng",
+      "sender_id": "person.maya",
+      "body": "Was running the migration dry-run again this weekend. Most pass clean. Couple timed out.",
+      "sim_time": 1,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.general.2",
+      "channel_id": "channel.general",
+      "sender_id": "person.alex",
+      "body": "👋 New TPM joining today. v2.4 launch is the priority. Talk to me if anything blocks shipping.",
+      "sim_time": 1,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.2",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.morgan",
+      "body": "I'll need a customer-facing changelog blurb by Thursday EOD to brief AEs.",
+      "sim_time": 1,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.audit.3",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.priya",
+      "body": "@person.sam quick callout: PRD shows localised dates on the API, eng spec has UTC ISO-8601. We need one answer. I'll raise this week.",
+      "sim_time": 2,
+      "thread_root_id": null,
+      "mentions": [
+        "person.sam"
+      ],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.3",
+      "channel_id": "channel.eng",
+      "sender_id": "person.kai",
+      "body": "@person.maya which ones? if it's the events table again that's been flaky for a year",
+      "sim_time": 2,
+      "thread_root_id": null,
+      "mentions": [
+        "person.maya"
+      ],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.general.3",
+      "channel_id": "channel.general",
+      "sender_id": "person.morgan",
+      "body": "Reminder: three closed-won deals are gated on audit-log shipping in v2.4. No slippage please.",
+      "sim_time": 2,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.3",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.jordan",
+      "body": "Support's standing by. Runbook v3 reviewed and merged.",
+      "sim_time": 2,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.audit.4",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.sam",
+      "body": "Customers see localised. API is implementation detail — we can hide the rest.",
+      "sim_time": 3,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.4",
+      "channel_id": "channel.eng",
+      "sender_id": "person.maya",
+      "body": "yeah, events. ~1 in 5. I'll keep poking at it.",
+      "sim_time": 3,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.4",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.dani",
+      "body": "Robin will be coordinating from here on. Loop them in on everything.",
+      "sim_time": 3,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.audit.5",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.priya",
+      "body": "API is not an implementation detail when partners are integrating. Anyway — let's discuss this week with a decision-maker.",
+      "sim_time": 4,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.5",
+      "channel_id": "channel.eng",
+      "sender_id": "person.priya",
+      "body": "Audit-log scaffolding merged. Spec doc updated; comments welcome.",
+      "sim_time": 4,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.5",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.kai",
+      "body": "Migration plan v3 is in the runbook. Pre-mortem doc is open in #engineering.",
+      "sim_time": 4,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.audit.6",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.dani",
+      "body": "Park this until a PM is in the loop. Robin's starting Mon.",
+      "sim_time": 5,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.6",
+      "channel_id": "channel.eng",
+      "sender_id": "person.dani",
+      "body": "Folks, please keep status on the v24 board updated daily this week.",
+      "sim_time": 5,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.6",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.kai",
+      "body": "Reminder we're freezing non-critical merges Wed 18:00. Audit-log work continues, but no new v24 features.",
+      "sim_time": 5,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.audit.7",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.morgan",
+      "body": "FYI I've promised the audit-log capability to three accounts in Q2 closes.",
+      "sim_time": 6,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.7",
+      "channel_id": "channel.eng",
+      "sender_id": "person.kai",
+      "body": "Will do. RC cut should be unblocked once smoke tests are green.",
+      "sim_time": 6,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.7",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.jordan",
+      "body": "Couple of customers asking when v2.4 actually ships. Same answer: Friday EOD pending green smoke.",
+      "sim_time": 6,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.audit.8",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.priya",
+      "body": "Backend scaffolding green. QA pass blocked on the date-field decision.",
+      "sim_time": 7,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.8",
+      "channel_id": "channel.eng",
+      "sender_id": "person.priya",
+      "body": "FYI Sam and I are still aligning on the date field for the API. Will sort it this week.",
+      "sim_time": 7,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.8",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.morgan",
+      "body": "👍 holding the line.",
+      "sim_time": 7,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.audit.9",
+      "channel_id": "channel.audit-log",
+      "sender_id": "person.sam",
+      "body": "Same — frontend rendering pending the call.",
+      "sim_time": 8,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.9",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.maya",
+      "body": "I'll have an update on the migration dry-runs by Tue.",
+      "sim_time": 8,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.general.4",
+      "channel_id": "channel.general",
+      "sender_id": "person.priya",
+      "body": "Welcome Robin! Holler if you want a coffee chat re: audit-log.",
+      "sim_time": 11,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.9",
+      "channel_id": "channel.eng",
+      "sender_id": "person.dani",
+      "body": "@person.tpm — please run morning standups in #engineering starting tomorrow. Async if folks prefer.",
+      "sim_time": 12,
+      "thread_root_id": null,
+      "mentions": [
+        "person.tpm"
+      ],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.general.5",
+      "channel_id": "channel.general",
+      "sender_id": "person.jordan",
+      "body": "Customer-success huddle this Thursday 11am — feel free to drop in.",
+      "sim_time": 12,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.10",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.dani",
+      "body": "Tracking risk register on the launch-readiness doc.",
+      "sim_time": 12,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.10",
+      "channel_id": "channel.eng",
+      "sender_id": "person.kai",
+      "body": "Migration plan PR up for review. PTAL @person.priya.",
+      "sim_time": 13,
+      "thread_root_id": null,
+      "mentions": [
+        "person.priya"
+      ],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.general.6",
+      "channel_id": "channel.general",
+      "sender_id": "person.dani",
+      "body": "FYI quarterly all-hands on Friday at 16:00. Robin you don't have to present this week.",
+      "sim_time": 13,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.11",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.kai",
+      "body": "I want the launch-readiness summary Wed EOD. Whoever's TPM.",
+      "sim_time": 13,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.11",
+      "channel_id": "channel.eng",
+      "sender_id": "person.priya",
+      "body": "On it after the audit-log review.",
+      "sim_time": 14,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.general.7",
+      "channel_id": "channel.general",
+      "sender_id": "person.sam",
+      "body": "Reminder: design-eng sync Thursday 14:00.",
+      "sim_time": 14,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.v24.12",
+      "channel_id": "channel.launch-v24",
+      "sender_id": "person.jordan",
+      "body": "Setting up tomorrow's support coverage rota.",
+      "sim_time": 14,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "msg.eng.12",
+      "channel_id": "channel.eng",
+      "sender_id": "person.maya",
+      "body": "TPM onboarding doc updated with the latest team contacts.",
+      "sim_time": 15,
+      "thread_root_id": null,
+      "mentions": [],
+      "read_by": [
+        "person.tpm"
+      ]
+    }
+  ],
+  "email_threads": [
+    {
+      "id": "thread.audit_kickoff",
+      "subject": "Audit-log feature kickoff notes",
+      "participants": [
+        "person.tpm",
+        "person.priya",
+        "person.sam",
+        "person.dani"
+      ]
+    },
+    {
+      "id": "thread.calendar_setup",
+      "subject": "Robin's recurring 1:1s and standups",
+      "participants": [
+        "person.tpm",
+        "person.dani"
+      ]
+    },
+    {
+      "id": "thread.customer_qbr",
+      "subject": "Customer QBR — BigCorp",
+      "participants": [
+        "person.tpm",
+        "person.morgan",
+        "person.jordan"
+      ]
+    },
+    {
+      "id": "thread.last_quarter_retro",
+      "subject": "Q1 retro notes (FYI for new TPM)",
+      "participants": [
+        "person.tpm",
+        "person.dani",
+        "person.kai"
+      ]
+    },
+    {
+      "id": "thread.legal_review",
+      "subject": "Legal review — audit-log retention",
+      "participants": [
+        "person.tpm",
+        "person.dani",
+        "person.priya"
+      ]
+    },
+    {
+      "id": "thread.onboarding",
+      "subject": "TPM onboarding — pinned resources",
+      "participants": [
+        "person.tpm",
+        "person.dani",
+        "person.maya"
+      ]
+    },
+    {
+      "id": "thread.partner_inquiry",
+      "subject": "Partner inquiry: audit-log API contract",
+      "participants": [
+        "person.tpm",
+        "person.morgan"
+      ]
+    },
+    {
+      "id": "thread.pipeline_proposal",
+      "subject": "Data pipeline refactor — RFC",
+      "participants": [
+        "person.tpm",
+        "person.kai",
+        "person.dani"
+      ]
+    },
+    {
+      "id": "thread.q2_roadmap",
+      "subject": "Q2 roadmap snapshot",
+      "participants": [
+        "person.tpm",
+        "person.dani",
+        "person.alex",
+        "person.morgan"
+      ]
+    },
+    {
+      "id": "thread.security_advisory",
+      "subject": "Internal: dependency advisory (low risk)",
+      "participants": [
+        "person.tpm",
+        "person.kai",
+        "person.dani"
+      ]
+    },
+    {
+      "id": "thread.support_runbook",
+      "subject": "Support runbook v3 for v2.4",
+      "participants": [
+        "person.tpm",
+        "person.jordan",
+        "person.kai"
+      ]
+    },
+    {
+      "id": "thread.welcome",
+      "subject": "Welcome to Lumen — first-week priorities",
+      "participants": [
+        "person.tpm",
+        "person.dani"
+      ]
+    }
+  ],
+  "emails": [
+    {
+      "id": "email.welcome.1",
+      "thread_id": "thread.welcome",
+      "sender_id": "person.dani",
+      "to": [
+        "person.tpm"
+      ],
+      "cc": [],
+      "body": "Welcome aboard. v2.4 ships Friday. Your priorities this week:\n  1. Land the v2.4 launch with no surprises.\n  2. Get the audit-log work onto a credible track.\n  3. Make sure the pipeline refactor RFC has a decision by EOW.\nWe have a 1:1 on the calendar daily at 16:30. Use it to flag anything.\n",
+      "sim_time": 0,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.onboarding.1",
+      "thread_id": "thread.onboarding",
+      "sender_id": "person.maya",
+      "to": [
+        "person.tpm"
+      ],
+      "cc": [
+        "person.dani"
+      ],
+      "body": "Hi Robin — putting these on your radar:\n  - v2.4 launch board: /tasks?project=V24\n  - Audit-log PRD: doc.audit_prd\n  - Pipeline RFC: doc.pipeline_rfc\n  - Runbook: doc.runbook_v24\nI'll be in #engineering most days. Happy to walk you through anything.\n",
+      "sim_time": 1,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.q2.1",
+      "thread_id": "thread.q2_roadmap",
+      "sender_id": "person.alex",
+      "to": [
+        "person.tpm",
+        "person.dani"
+      ],
+      "cc": [
+        "person.morgan"
+      ],
+      "body": "Robin — for awareness. Q2 has v2.4 (this week), the audit-log feature\nfollowing on, and pipeline refactor running in parallel. I'll be in\nand out this week. If you need me, email — I read everything.\n",
+      "sim_time": 2,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.support.1",
+      "thread_id": "thread.support_runbook",
+      "sender_id": "person.jordan",
+      "to": [
+        "person.tpm",
+        "person.kai"
+      ],
+      "cc": [],
+      "body": "Hi — runbook v3 is locked. Two open questions:\n  1. Who's on point for the post-deploy customer comms?\n  2. Are we offering a rollback window? (Currently the runbook says\n     4 hours but Kai mentioned 2.)\nWould love a TPM steer on (1).\n",
+      "sim_time": 3,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.audit.1",
+      "thread_id": "thread.audit_kickoff",
+      "sender_id": "person.priya",
+      "to": [
+        "person.tpm"
+      ],
+      "cc": [
+        "person.dani",
+        "person.sam"
+      ],
+      "body": "Hi Robin — audit-log feature kickoff notes attached (see doc.audit_prd\nand doc.audit_eng_spec). One open issue: Sam and I disagree on the\ndate-field format for the customer-facing API. Surfacing now so we\ncan land a decision early.\n",
+      "sim_time": 4,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.legal.1",
+      "thread_id": "thread.legal_review",
+      "sender_id": "person.dani",
+      "to": [
+        "person.tpm",
+        "person.priya"
+      ],
+      "cc": [],
+      "body": "Legal wants confirmation that audit-log retention is 90 days max.\nEng spec currently says 365. Please reconcile before the spec is\nhanded to legal next Monday.\n",
+      "sim_time": 5,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.retro.1",
+      "thread_id": "thread.last_quarter_retro",
+      "sender_id": "person.kai",
+      "to": [
+        "person.tpm",
+        "person.dani"
+      ],
+      "cc": [],
+      "body": "Last quarter's retro takeaways for context:\n  - Migrations are always our biggest deploy risk.\n  - Customer comms have been late three releases in a row.\n  - We commit to dates without consulting Eng too often.\n",
+      "sim_time": 6,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.partner.1",
+      "thread_id": "thread.partner_inquiry",
+      "sender_id": "person.morgan",
+      "to": [
+        "person.tpm"
+      ],
+      "cc": [],
+      "body": "One of our partners is asking for the audit-log API contract early so\nthey can start their integration. Can you give me a date by Wed?\n",
+      "sim_time": 7,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.qbr.1",
+      "thread_id": "thread.customer_qbr",
+      "sender_id": "person.morgan",
+      "to": [
+        "person.tpm",
+        "person.jordan"
+      ],
+      "cc": [],
+      "body": "QBR with BigCorp next month. They've been twitchy about uptime this\nquarter. Just FYI as you read into the account.\n",
+      "sim_time": 8,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.pipeline.1",
+      "thread_id": "thread.pipeline_proposal",
+      "sender_id": "person.kai",
+      "to": [
+        "person.tpm",
+        "person.dani"
+      ],
+      "cc": [],
+      "body": "Pipeline refactor RFC is up. Decision needed by EOW on whether to\nproceed in Q2 or push to Q3. My recommendation: push to Q3 —\naudit-log is going to chew through eng cycles.\n",
+      "sim_time": 9,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.cal.1",
+      "thread_id": "thread.calendar_setup",
+      "sender_id": "person.dani",
+      "to": [
+        "person.tpm"
+      ],
+      "cc": [],
+      "body": "Calendar set up:\n  - Daily 1:1 with me at 16:30\n  - Eng standup at 09:30 (#engineering)\n  - Launch readiness review Wed 14:00\n  - Audit-log spec review Thu 14:00\n  - All-hands Fri 16:00\n",
+      "sim_time": 10,
+      "read_by": [
+        "person.tpm"
+      ]
+    },
+    {
+      "id": "email.security.1",
+      "thread_id": "thread.security_advisory",
+      "sender_id": "person.kai",
+      "to": [
+        "person.tpm",
+        "person.dani"
+      ],
+      "cc": [],
+      "body": "Low-risk advisory on the lib we use for token signing. Patch landed\nalready, just FYI — no action required.\n",
+      "sim_time": 11,
+      "read_by": [
+        "person.tpm"
+      ]
+    }
+  ],
+  "tasks": [
+    {
+      "id": "task.AUDIT-1",
+      "project": "AUDIT",
+      "title": "Audit-log PRD signoff",
+      "description": "Get PRD sign-off from design + eng.",
+      "status": "In Review",
+      "assignee_id": "person.priya",
+      "reporter_id": "person.tpm",
+      "priority": "P1",
+      "estimated_effort_seconds": 1800,
+      "remaining_effort_seconds": 1800,
+      "deadline_sim_time": 5760,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.AUDIT-2",
+      "project": "AUDIT",
+      "title": "Resolve date-field format disagreement",
+      "description": "Pick one format (ISO-8601 UTC vs localised) and document in both PRD and eng spec.",
+      "status": "In Review",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.dani",
+      "priority": "P0",
+      "estimated_effort_seconds": 3600,
+      "remaining_effort_seconds": 3600,
+      "deadline_sim_time": 5040,
+      "depends_on": [],
+      "comments": [
+        {
+          "author_id": "person.tpm",
+          "body": "Decision: adopt ISO-8601 UTC timestamps for all audit-log API responses (as specified in the eng spec). The frontend handles localisation for display. This is the simpler, more interoperable choice and aligns with the eng spec already written by Priya. Both PRD and eng spec should reflect this. Notifying Sam (PRD author) and Priya (eng spec author) to update their docs accordingly.",
+          "sim_time": 20
+        }
+      ]
+    },
+    {
+      "id": "task.AUDIT-3",
+      "project": "AUDIT",
+      "title": "Backend scaffolding",
+      "description": "Initial endpoints and DB schema for audit-log.",
+      "status": "Done",
+      "assignee_id": "person.priya",
+      "reporter_id": "person.dani",
+      "priority": "P1",
+      "estimated_effort_seconds": null,
+      "remaining_effort_seconds": null,
+      "deadline_sim_time": null,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.AUDIT-4",
+      "project": "AUDIT",
+      "title": "Frontend rendering",
+      "description": "Build the customer-facing audit-log viewer.",
+      "status": "Blocked",
+      "assignee_id": "person.sam",
+      "reporter_id": "person.priya",
+      "priority": "P2",
+      "estimated_effort_seconds": 21600,
+      "remaining_effort_seconds": 21600,
+      "deadline_sim_time": 8640,
+      "depends_on": [
+        "task.AUDIT-2"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.AUDIT-5",
+      "project": "AUDIT",
+      "title": "API contract for partners",
+      "description": "Public API contract doc for partner integration.",
+      "status": "Backlog",
+      "assignee_id": "person.priya",
+      "reporter_id": "person.morgan",
+      "priority": "P1",
+      "estimated_effort_seconds": 7200,
+      "remaining_effort_seconds": 7200,
+      "deadline_sim_time": 4320,
+      "depends_on": [
+        "task.AUDIT-2"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.AUDIT-6",
+      "project": "AUDIT",
+      "title": "Reconcile audit-log retention with legal",
+      "description": "Eng spec says 365 days, legal wants 90. Pick one, update docs.",
+      "status": "Backlog",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.dani",
+      "priority": "P1",
+      "estimated_effort_seconds": 1800,
+      "remaining_effort_seconds": 1800,
+      "deadline_sim_time": 7200,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.AUDIT-7",
+      "project": "AUDIT",
+      "title": "QA pass on audit-log",
+      "description": "Full QA after frontend lands.",
+      "status": "Backlog",
+      "assignee_id": "person.maya",
+      "reporter_id": "person.priya",
+      "priority": "P2",
+      "estimated_effort_seconds": 14400,
+      "remaining_effort_seconds": 14400,
+      "deadline_sim_time": 10080,
+      "depends_on": [
+        "task.AUDIT-4"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.OPS-1",
+      "project": "OPS",
+      "title": "Set up Robin's recurring 1:1s",
+      "description": "Calendar invites with all directs and key cross-functional partners.",
+      "status": "Backlog",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.dani",
+      "priority": "P3",
+      "estimated_effort_seconds": 1800,
+      "remaining_effort_seconds": 1800,
+      "deadline_sim_time": null,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.OPS-2",
+      "project": "OPS",
+      "title": "Triage incoming customer escalations",
+      "description": "Standing task — handle the inbox.",
+      "status": "In Progress",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.jordan",
+      "priority": "P1",
+      "estimated_effort_seconds": null,
+      "remaining_effort_seconds": null,
+      "deadline_sim_time": null,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.OPS-3",
+      "project": "OPS",
+      "title": "Weekly written status to leadership",
+      "description": "Friday EOD recap.",
+      "status": "Backlog",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.dani",
+      "priority": "P2",
+      "estimated_effort_seconds": null,
+      "remaining_effort_seconds": null,
+      "deadline_sim_time": 6480,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.OPS-4",
+      "project": "OPS",
+      "title": "Document on-call rotation for v2.4 launch",
+      "description": "Who's primary, secondary, comms lead — for Fri/Sat/Sun.",
+      "status": "Backlog",
+      "assignee_id": "person.jordan",
+      "reporter_id": "person.tpm",
+      "priority": "P1",
+      "estimated_effort_seconds": 1800,
+      "remaining_effort_seconds": 1800,
+      "deadline_sim_time": 4320,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.OPS-5",
+      "project": "OPS",
+      "title": "Confirm audit-log capability commitment with sales",
+      "description": "Confirm the three Q2 deals' scope expectations with Morgan.",
+      "status": "Backlog",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.morgan",
+      "priority": "P1",
+      "estimated_effort_seconds": 1800,
+      "remaining_effort_seconds": 1800,
+      "deadline_sim_time": null,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.PIPE-1",
+      "project": "PIPE",
+      "title": "Pipeline refactor RFC decision",
+      "description": "Decide Q2 or Q3 for the pipeline refactor. RFC is up.",
+      "status": "Todo",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.dani",
+      "priority": "P1",
+      "estimated_effort_seconds": 3600,
+      "remaining_effort_seconds": 3600,
+      "deadline_sim_time": 7200,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.PIPE-2",
+      "project": "PIPE",
+      "title": "Pipeline schema draft",
+      "description": "Draft the proposed schema for the new pipeline.",
+      "status": "Backlog",
+      "assignee_id": "person.kai",
+      "reporter_id": "person.dani",
+      "priority": "P2",
+      "estimated_effort_seconds": 14400,
+      "remaining_effort_seconds": 14400,
+      "deadline_sim_time": null,
+      "depends_on": [
+        "task.PIPE-1"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.PIPE-3",
+      "project": "PIPE",
+      "title": "Pipeline migration plan",
+      "description": "End-to-end migration plan with rollback.",
+      "status": "Backlog",
+      "assignee_id": "person.kai",
+      "reporter_id": "person.dani",
+      "priority": "P2",
+      "estimated_effort_seconds": 10800,
+      "remaining_effort_seconds": 10800,
+      "deadline_sim_time": null,
+      "depends_on": [
+        "task.PIPE-2"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.V24-1",
+      "project": "V24",
+      "title": "Run final smoke tests on v2.4 RC",
+      "description": "Full test suite + integration smoke against staging.",
+      "status": "In Progress",
+      "assignee_id": "person.kai",
+      "reporter_id": "person.dani",
+      "priority": "P0",
+      "estimated_effort_seconds": 14400,
+      "remaining_effort_seconds": 7200,
+      "deadline_sim_time": 720,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.V24-10",
+      "project": "V24",
+      "title": "Send launch-readiness summary to CEO",
+      "description": "Concise written summary of status, risks, and the deploy plan.",
+      "status": "Backlog",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.alex",
+      "priority": "P0",
+      "estimated_effort_seconds": 2400,
+      "remaining_effort_seconds": 2400,
+      "deadline_sim_time": 3540,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.V24-2",
+      "project": "V24",
+      "title": "Cut v2.4 release branch",
+      "description": "Tag release/v2.4 from main once smoke is green.",
+      "status": "Backlog",
+      "assignee_id": "person.kai",
+      "reporter_id": "person.dani",
+      "priority": "P0",
+      "estimated_effort_seconds": 1800,
+      "remaining_effort_seconds": 1800,
+      "deadline_sim_time": 720,
+      "depends_on": [
+        "task.V24-1"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.V24-3",
+      "project": "V24",
+      "title": "Update v2.4 changelog",
+      "description": "Customer-facing release notes.",
+      "status": "Backlog",
+      "assignee_id": "person.kai",
+      "reporter_id": "person.tpm",
+      "priority": "P1",
+      "estimated_effort_seconds": 3600,
+      "remaining_effort_seconds": 3600,
+      "deadline_sim_time": 4320,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.V24-4",
+      "project": "V24",
+      "title": "Notify customers of v2.4 deploy window",
+      "description": "Email all affected customers with the deploy window and rollback policy.",
+      "status": "Backlog",
+      "assignee_id": "person.morgan",
+      "reporter_id": "person.tpm",
+      "priority": "P1",
+      "estimated_effort_seconds": 5400,
+      "remaining_effort_seconds": 5400,
+      "deadline_sim_time": 4320,
+      "depends_on": [
+        "task.V24-2"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.V24-5",
+      "project": "V24",
+      "title": "Validate v2.4 migration under load",
+      "description": "Re-run the migration dry-run with a synthetic concurrent write workload.",
+      "status": "In Progress",
+      "assignee_id": "person.maya",
+      "reporter_id": "person.kai",
+      "priority": "P0",
+      "estimated_effort_seconds": 10800,
+      "remaining_effort_seconds": 7200,
+      "deadline_sim_time": 2880,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.V24-6",
+      "project": "V24",
+      "title": "Deploy v2.4 to production",
+      "description": "Final deploy. Coordinated with support.",
+      "status": "Backlog",
+      "assignee_id": "person.kai",
+      "reporter_id": "person.dani",
+      "priority": "P0",
+      "estimated_effort_seconds": 7200,
+      "remaining_effort_seconds": 7200,
+      "deadline_sim_time": 5760,
+      "depends_on": [
+        "task.V24-1",
+        "task.V24-2",
+        "task.V24-5"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.V24-7",
+      "project": "V24",
+      "title": "Stage rollback plan v3",
+      "description": "Stage the rollback artefacts and verify the runbook is up to date.",
+      "status": "Backlog",
+      "assignee_id": "person.kai",
+      "reporter_id": "person.jordan",
+      "priority": "P1",
+      "estimated_effort_seconds": 5400,
+      "remaining_effort_seconds": 5400,
+      "deadline_sim_time": 4320,
+      "depends_on": [],
+      "comments": []
+    },
+    {
+      "id": "task.V24-8",
+      "project": "V24",
+      "title": "Customer-facing comms approved by sales",
+      "description": "Get Morgan's sign-off on the release-notes blurb.",
+      "status": "Backlog",
+      "assignee_id": "person.morgan",
+      "reporter_id": "person.tpm",
+      "priority": "P2",
+      "estimated_effort_seconds": 1800,
+      "remaining_effort_seconds": 1800,
+      "deadline_sim_time": 4320,
+      "depends_on": [
+        "task.V24-3"
+      ],
+      "comments": []
+    },
+    {
+      "id": "task.V24-9",
+      "project": "V24",
+      "title": "Wednesday launch readiness review",
+      "description": "Run the launch-readiness review meeting; capture decisions.",
+      "status": "Backlog",
+      "assignee_id": "person.tpm",
+      "reporter_id": "person.dani",
+      "priority": "P1",
+      "estimated_effort_seconds": 3600,
+      "remaining_effort_seconds": 3600,
+      "deadline_sim_time": 3600,
+      "depends_on": [],
+      "comments": []
+    }
+  ],
+  "docs": [
+    {
+      "id": "doc.audit_eng_spec",
+      "title": "Audit-log feature — Engineering spec",
+      "created_by": "person.priya",
+      "versions": [
+        {
+          "version": 1,
+          "author_id": "person.priya",
+          "body": "# Audit-log Engineering Spec\n\n## API\n- Endpoint: `GET /v1/audit-log`\n- **All timestamps returned in ISO-8601 UTC.** Frontend handles localisation.\n- Pagination via cursor.\n\n## Storage\n- Append-only table; partitioned weekly.\n- Retention: 365 days (under legal review).\n\n## Open question\n- Date format must be reconciled with the PRD before integration tests\n  can be authored.\n",
+          "sim_time": 0
+        }
+      ],
+      "comments": [],
+      "acl_view": null,
+      "acl_edit": null
+    },
+    {
+      "id": "doc.audit_prd",
+      "title": "Audit-log feature — PRD",
+      "created_by": "person.sam",
+      "versions": [
+        {
+          "version": 1,
+          "author_id": "person.sam",
+          "body": "# Audit-log PRD\n\n## Goal\nGive customer admins a queryable log of state changes affecting their workspace.\n\n## Surface\n- Web UI: filterable table.\n- **Dates rendered in the user's locale, including in the API response.**\n- Export to CSV.\n\n## Retention\n- Default 365 days.\n\n## Out of scope\n- Per-event diffing (planned for v2.5).\n",
+          "sim_time": 0
+        }
+      ],
+      "comments": [],
+      "acl_view": null,
+      "acl_edit": null
+    },
+    {
+      "id": "doc.onboarding_tpm",
+      "title": "TPM onboarding — first week",
+      "created_by": "person.dani",
+      "versions": [
+        {
+          "version": 1,
+          "author_id": "person.dani",
+          "body": "# TPM onboarding\n\n## First-week priorities\n1. Land v2.4 with no customer-visible regressions.\n2. Resolve open audit-log decisions (PRD vs eng spec).\n3. Decide pipeline RFC by EOW.\n\n## People to meet\n- Kai (Sr Backend, owns v2.4)\n- Priya (Eng Lead, owns audit-log)\n- Sam (Designer, audit-log)\n- Jordan (Support Lead)\n- Maya (Junior backend; her status updates are precise — listen)\n- Morgan (Sales; cares about audit-log shipping)\n\n## Norms\n- Standups async-first in #engineering.\n- Daily 1:1 with Dani at 16:30.\n",
+          "sim_time": 0
+        }
+      ],
+      "comments": [],
+      "acl_view": null,
+      "acl_edit": null
+    },
+    {
+      "id": "doc.pipeline_rfc",
+      "title": "Data pipeline refactor — RFC",
+      "created_by": "person.kai",
+      "versions": [
+        {
+          "version": 1,
+          "author_id": "person.kai",
+          "body": "# Data pipeline refactor RFC\n\n## Motivation\nCurrent pipeline is event-batch only; we need streaming for the new\naudit-log feature and for the partner integrations Morgan is closing.\n\n## Proposal\nRefactor to a Kafka-based ingest with a Postgres sink. Two-quarter\nproject; Q2 is the earliest possible start.\n\n## Decision needed\n- Greenlight Q2 start, or defer to Q3?\n\n## Recommendation\nDefer to Q3. Q2 capacity should go to audit-log and v2.4 stabilisation.\n",
+          "sim_time": 0
+        }
+      ],
+      "comments": [],
+      "acl_view": null,
+      "acl_edit": null
+    },
+    {
+      "id": "doc.q1_retro",
+      "title": "Q1 retrospective notes (FYI)",
+      "created_by": "person.dani",
+      "versions": [
+        {
+          "version": 1,
+          "author_id": "person.dani",
+          "body": "# Q1 retro — top three takeaways\n1. Migrations are our biggest deploy risk. Always do a load dry-run.\n2. Customer comms run late three releases out of four.\n3. We over-commit on dates without consulting eng. Stop doing this.\n",
+          "sim_time": 0
+        }
+      ],
+      "comments": [],
+      "acl_view": null,
+      "acl_edit": null
+    },
+    {
+      "id": "doc.runbook_v24",
+      "title": "v2.4 deploy runbook",
+      "created_by": "person.kai",
+      "versions": [
+        {
+          "version": 1,
+          "author_id": "person.kai",
+          "body": "# v2.4 Deploy Runbook (v3)\n\n## Pre-deploy\n- All smoke tests green on staging.\n- Migration dry-run passes on the prod-shadow workspace.\n- Customer comms email sent ≥ 24h before deploy window.\n\n## Deploy window\n- Friday 13:00–17:00 PT.\n- Primary on-call: Kai. Secondary: Maya. Comms: Jordan.\n\n## Rollback\n- Rollback window: 2 hours after deploy.\n- Procedure: revert release tag, restore DB from snapshot S-v24-pre.\n- DRI for rollback decision: VP Eng (Dani).\n",
+          "sim_time": 0
+        }
+      ],
+      "comments": [],
+      "acl_view": null,
+      "acl_edit": null
+    }
+  ],
+  "calendar": [
+    {
+      "id": "cal.standup.mon",
+      "title": "Eng standup",
+      "start_sim_time": 30,
+      "end_sim_time": 60,
+      "organizer_id": "person.dani",
+      "attendees": [
+        "person.tpm",
+        "person.dani",
+        "person.kai",
+        "person.maya",
+        "person.priya"
+      ],
+      "location": "#engineering (async)",
+      "agenda": "Daily standup — async ok, but block 09:30 for sync questions.",
+      "attended_by_agent": false
+    },
+    {
+      "id": "cal.daily_1on1",
+      "title": "Robin <> Dani 1:1",
+      "start_sim_time": 450,
+      "end_sim_time": 480,
+      "organizer_id": "person.dani",
+      "attendees": [
+        "person.tpm",
+        "person.dani"
+      ],
+      "location": "Dani's office",
+      "agenda": "Daily 1:1 — flag what you need.",
+      "attended_by_agent": false
+    },
+    {
+      "id": "cal.standup.tue",
+      "title": "Eng standup",
+      "start_sim_time": 1470,
+      "end_sim_time": 1500,
+      "organizer_id": "person.dani",
+      "attendees": [
+        "person.tpm",
+        "person.dani",
+        "person.kai",
+        "person.maya",
+        "person.priya"
+      ],
+      "location": "#engineering",
+      "agenda": "Daily standup.",
+      "attended_by_agent": false
+    },
+    {
+      "id": "cal.standup.wed",
+      "title": "Eng standup",
+      "start_sim_time": 2910,
+      "end_sim_time": 2940,
+      "organizer_id": "person.dani",
+      "attendees": [
+        "person.tpm",
+        "person.dani",
+        "person.kai",
+        "person.maya",
+        "person.priya"
+      ],
+      "location": "#engineering",
+      "agenda": "Daily standup.",
+      "attended_by_agent": false
+    },
+    {
+      "id": "cal.launch_review",
+      "title": "v2.4 Launch Readiness Review",
+      "start_sim_time": 3060,
+      "end_sim_time": 3120,
+      "organizer_id": "person.dani",
+      "attendees": [
+        "person.tpm",
+        "person.dani",
+        "person.kai",
+        "person.morgan",
+        "person.jordan",
+        "person.maya"
+      ],
+      "location": "Conf Room 1 / Zoom",
+      "agenda": "1. Is v2.4 green for Friday deploy? (Kai)\n2. Customer comms status. (Morgan)\n3. Rollback plan walkthrough. (Jordan + Kai)\n4. Open risks (Robin to flag).\n",
+      "attended_by_agent": false
+    },
+    {
+      "id": "cal.standup.thu",
+      "title": "Eng standup",
+      "start_sim_time": 4350,
+      "end_sim_time": 4380,
+      "organizer_id": "person.dani",
+      "attendees": [
+        "person.tpm",
+        "person.dani",
+        "person.kai",
+        "person.maya",
+        "person.priya"
+      ],
+      "location": "#engineering",
+      "agenda": "Daily standup.",
+      "attended_by_agent": false
+    },
+    {
+      "id": "cal.audit_spec_review",
+      "title": "Audit-log spec review",
+      "start_sim_time": 4500,
+      "end_sim_time": 4560,
+      "organizer_id": "person.priya",
+      "attendees": [
+        "person.tpm",
+        "person.priya",
+        "person.sam",
+        "person.dani",
+        "person.morgan"
+      ],
+      "location": "Conf Room 1",
+      "agenda": "Reconcile the date-field format question between PRD and eng spec.\nRobin to drive a decision.\n",
+      "attended_by_agent": false
+    },
+    {
+      "id": "cal.standup.fri",
+      "title": "Eng standup",
+      "start_sim_time": 5790,
+      "end_sim_time": 5820,
+      "organizer_id": "person.dani",
+      "attendees": [
+        "person.tpm",
+        "person.dani",
+        "person.kai",
+        "person.maya",
+        "person.priya"
+      ],
+      "location": "#engineering",
+      "agenda": "Daily standup.",
+      "attended_by_agent": false
+    }
+  ],
+  "meeting_transcripts": [],
+  "notifications": []
+}

@@ -57,9 +57,9 @@ def test_week_one_launch_matches_plan_benchmarks():
     assert len(s.world.emails) == 12
     assert len(s.world.tasks) == 25
     assert len(s.world.docs) == 6
-    assert len(s.eval_ground_truth.objectives) == 15
+    assert len(s.eval_ground_truth.objectives) == 18
     assert len(s.eval_ground_truth.artifacts) == 3
-    assert len(s.eval_ground_truth.anti_hack) == 6
+    assert len(s.eval_ground_truth.anti_hack) == 4
 
 
 def test_week_one_launch_lint_clean():
@@ -102,6 +102,58 @@ def test_week_one_launch_scheduled_events_fire_in_order():
     ceo_emails = [e for e in s.world.emails.values() if e.sender_id == "person.alex"]
     # We have one CEO email arriving as a scheduled event (plus none seeded with alex as sender)
     assert any("launch" in (s.world.email_threads[e.thread_id].subject.lower()) for e in ceo_emails)
+
+
+def test_smoke_default_tick_size_is_15():
+    s = load_scenario(SMOKE)
+    assert s.config.tick_size_minutes == 15
+
+
+def test_week_one_launch_default_tick_size_is_15():
+    s = load_scenario(WEEK_ONE)
+    assert s.config.tick_size_minutes == 15
+
+
+def test_explicit_tick_size_in_yaml_is_reflected(tmp_path):
+    (tmp_path / "personas").mkdir()
+    (tmp_path / "scenario.yaml").write_text(
+        "id: x\nseed: 0\nagent_id: person.tpm\ntick_size_minutes: 30\n"
+    )
+    (tmp_path / "personas" / "tpm.yaml").write_text(
+        "id: person.tpm\ndisplay_name: TPM\nrole: tpm\nis_agent: true\n"
+    )
+    s = load_scenario(tmp_path)
+    assert s.config.tick_size_minutes == 30
+
+
+def test_load_scenario_tick_size_override_takes_precedence(tmp_path):
+    (tmp_path / "personas").mkdir()
+    (tmp_path / "scenario.yaml").write_text(
+        "id: x\nseed: 0\nagent_id: person.tpm\ntick_size_minutes: 30\n"
+    )
+    (tmp_path / "personas" / "tpm.yaml").write_text(
+        "id: person.tpm\ndisplay_name: TPM\nrole: tpm\nis_agent: true\n"
+    )
+    s = load_scenario(tmp_path, tick_size_minutes=5)
+    assert s.config.tick_size_minutes == 5
+
+
+def test_cli_run_parses_tick_size_flag():
+    """Parser-level check that `--tick-size N` is accepted by `sim run`
+    and lands on the parsed args. (Avoids an end-to-end agent run.)"""
+    import argparse
+    from sim.cli import _add_run
+
+    parser = argparse.ArgumentParser()
+    sub = parser.add_subparsers(dest="cmd")
+    _add_run(sub)
+
+    args = parser.parse_args(["run", "--scenario", "x", "--tick-size", "45"])
+    assert args.tick_size == 45
+
+    # When omitted, tick_size is None so the scenario default applies.
+    args = parser.parse_args(["run", "--scenario", "x"])
+    assert args.tick_size is None
 
 
 def test_lint_detects_unknown_assignee(tmp_path):

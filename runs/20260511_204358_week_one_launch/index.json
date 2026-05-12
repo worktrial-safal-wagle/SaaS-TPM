@@ -1,0 +1,18 @@
+{
+  "turn_count": 100,
+  "error_count": 24,
+  "verdict_count": 0,
+  "tool_counts": {
+    "docs.read": 12,
+    "chat.read": 18,
+    "chat.list": 5,
+    "email.read": 34,
+    "tasks.get": 7,
+    "tasks.comment": 1,
+    "tasks.update_status": 1,
+    "email.list": 9,
+    "docs.list": 3,
+    "tasks.list": 10
+  },
+  "final_sim_time": 62
+}

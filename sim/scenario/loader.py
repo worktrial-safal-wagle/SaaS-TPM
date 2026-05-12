@@ -73,12 +73,19 @@ def _hhmm_to_minutes(s: str) -> int:
     return int(hh) * 60 + int(mm)
 
 
-def load_scenario(path: str | Path) -> LoadedScenario:
+def load_scenario(
+    path: str | Path,
+    *,
+    tick_size_minutes: int | None = None,
+) -> LoadedScenario:
     root = Path(path)
     if not root.is_dir():
         raise FileNotFoundError(f"scenario directory not found: {root}")
 
     config = ScenarioYaml.model_validate(_read_yaml(root / "scenario.yaml"))
+    # CLI-supplied tick size overrides the per-scenario default.
+    if tick_size_minutes is not None:
+        config = config.model_copy(update={"tick_size_minutes": tick_size_minutes})
 
     # Origin minute-of-week (0..10079); needed for business-hours math.
     origin = config.start.weekday * 24 * 60 + _hhmm_to_minutes(config.start.time)
@@ -268,7 +275,9 @@ def _make_event_handler(kind: str, world: World):
     if kind == "npc_send_email":
         return _make_email_sender(world)
     # Heartbeats and calendar starts are "marker" events with no side effect
-    # beyond their kind (e.g., `wait.for_next_event` listens for them).
+    # beyond their kind. They're still useful: the NPC runtime listens for
+    # `calendar_event_start` to set attendees' `busy_until`, and downstream
+    # tooling can scan them.
     return None
 
 

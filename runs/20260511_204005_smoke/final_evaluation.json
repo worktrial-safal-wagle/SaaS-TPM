@@ -1,0 +1,93 @@
+{
+  "completed": true,
+  "tier_used": "full",
+  "composite_score": 0.36866666666666664,
+  "metrics": [
+    {
+      "name": "error_rate",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 0.0,
+      "detail": {
+        "errors": 0,
+        "total": 12
+      }
+    },
+    {
+      "name": "turns_per_sim_hour",
+      "tier": "slice_safe",
+      "normalized": -0.3,
+      "raw": 1.5,
+      "detail": {
+        "turns": 12,
+        "sim_time": 480
+      }
+    },
+    {
+      "name": "repeat_read_rate",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 0.0,
+      "detail": {
+        "bad_reads": 0,
+        "total_reads": 1
+      }
+    },
+    {
+      "name": "anti_hack_max_messages",
+      "tier": "slice_safe",
+      "normalized": 0.9866666666666667,
+      "raw": 1.0,
+      "detail": {
+        "sent": 1,
+        "limit": 30
+      }
+    },
+    {
+      "name": "deadline_hit_rate",
+      "tier": "requires_full_run",
+      "normalized": 1.0,
+      "raw": 1.0,
+      "detail": {
+        "hits": 1,
+        "total": 1
+      }
+    },
+    {
+      "name": "stakeholder_contact_rate",
+      "tier": "requires_full_run",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "reason": "no_objectives"
+      }
+    }
+  ],
+  "judge": {
+    "tier": "full",
+    "axes": {
+      "specificity": {
+        "score": 0.0,
+        "rationale": ""
+      },
+      "decision_hygiene": {
+        "score": 0.0,
+        "rationale": ""
+      },
+      "risk_escalation": {
+        "score": 0.0,
+        "rationale": ""
+      },
+      "state_accuracy": {
+        "score": 0.0,
+        "rationale": "no judge configured"
+      }
+    },
+    "mean_score": 0.0
+  },
+  "artifacts": [],
+  "notes": [
+    "final_sim_time=480",
+    "end_sim_time=480"
+  ]
+}

@@ -19,8 +19,5 @@ venv/
 .mypy_cache/
 .ruff_cache/
 
-# Runs
-runs/
-
 # OS
 .DS_Store

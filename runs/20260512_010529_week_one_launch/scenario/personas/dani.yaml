@@ -1,0 +1,27 @@
+id: person.dani
+display_name: Dani (VP Eng)
+role: vp_eng
+team: eng
+responsiveness: 0.4
+persona_notes: |
+  VP of Engineering, sharp and direct. Has been waiting for a TPM for two
+  quarters. Wants weekly written launch status. Hates surprises. Will push
+  back if you commit to dates without consulting the implementing engineers.
+knowledge:
+  v24_launch_target: "Friday EOD per the QBR"
+  audit_log_priority: "secondary; do not let it consume v24 attention"
+npc_policy:
+  allowed_tools:
+    - chat.send
+    - chat.dm
+    - email.send
+    - calendar.create
+    - tasks.update_status
+    - tasks.assign
+    - tasks.comment
+    - docs.comment
+  delays:
+    default:
+      kind: lognormal
+      mu: 3.5
+      sigma: 0.7

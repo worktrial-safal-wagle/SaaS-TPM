@@ -1,0 +1,17 @@
+id: week_one_launch
+seed: 7
+agent_id: person.tpm
+start:
+  weekday: 0    # Monday
+  time: "09:00"
+end_sim_time: 7200    # Mon 09:00 + 5 days = Sat 09:00; eval gate fires after this
+description: |
+  Lumen Analytics, ~80-person SaaS company. The TPM is brand-new. v2.4 ships
+  this week. A junior dev DM'd them on day one about a flaky migration that
+  could block launch — but it's buried. Sometime Tue a customer escalation
+  arrives; Wed the CEO emails for a launch-readiness summary. Thursday a
+  design-vs-eng spec disagreement on the audit-log feature surfaces in chat.
+default_working_hours:
+  start_minute: 540   # 09:00
+  end_minute: 1080    # 18:00
+  weekdays: [0, 1, 2, 3, 4]

@@ -27,16 +27,20 @@ rubric. You see ONLY the artifact body, the rubric items, and a short
 ground-truth context block. You do NOT see the agent's transcript or
 self-narration.
 
-Return a single JSON object:
+Output JSON ONLY. The first character of your response must be `{`. Do
+not add prose, markdown fences, or commentary. Return exactly this shape,
+with ONE entry per rubric item, in the same order they were given:
 
 {
   "items": [
-    {"index": 0, "pass": true/false, "rationale": "<one short sentence>"},
-    ...
+    {"index": 0, "pass": true, "rationale": "<one short sentence>"},
+    {"index": 1, "pass": false, "rationale": "<one short sentence>"}
   ]
 }
 
-Be strict. If the artifact does not explicitly address an item, mark it false.
+Be strict: if the artifact does not explicitly address an item, mark it
+false. Do not skip items — the "items" array length must equal the number
+of rubric items in the user payload.
 """
 
 
@@ -48,6 +52,11 @@ class ArtifactScore:
     normalized_score: float  # in [-1, +1]
     items: list[dict[str, Any]]
     raw_body: str = ""
+    # The judge couldn't produce a verdict for this artifact (API error or
+    # malformed JSON after retries). The caller should exclude failed artifacts
+    # from the mean rather than treat them as half-passing.
+    failed: bool = False
+    failure_reason: str = ""
 
 
 def score_artifact(
@@ -77,10 +86,20 @@ def score_artifact(
         system_prompt=ARTIFACT_JUDGE_SYSTEM_PROMPT,
         user_payload=user_payload,
     )
+    if verdict.failed:
+        # Judge couldn't score it. Don't fabricate a 0.5 pass rate; surface
+        # the failure so the caller can exclude it from the artifact mean.
+        return ArtifactScore(
+            artifact_id=artifact_yaml["id"], found=True,
+            pass_rate=0.0, normalized_score=0.0, items=[],
+            raw_body=body, failed=True,
+            failure_reason=verdict.rationale or "judge_failed",
+        )
     items = verdict.raw.get("items") if verdict.raw else None
     if not items:
-        # Fall back to the bounded score the judge returned, treating
-        # +1.0 as full pass and -1.0 as full fail.
+        # The judge returned a verdict but skipped the per-item structure
+        # (e.g., a single-axis score with no rubric breakdown). Treat the
+        # bounded score as the source of truth.
         pr = max(0.0, min(1.0, (verdict.score + 1) / 2))
         return ArtifactScore(
             artifact_id=artifact_yaml["id"], found=True,
@@ -118,6 +137,7 @@ def _locate_email_thread_body(world: dict[str, Any], loc: dict[str, Any]) -> str
         tid for tid, t in threads.items()
         if subj_substr in (t.get("subject", "")).lower()
     ]
+    candidates: list[dict[str, Any]] = []
     for tid in matching_threads:
         for e in emails:
             if e.get("thread_id") != tid:
@@ -126,38 +146,51 @@ def _locate_email_thread_body(world: dict[str, Any], loc: dict[str, Any]) -> str
                 continue
             if recipient and recipient not in (e.get("to", [])) and recipient not in (e.get("cc", [])):
                 continue
-            return e.get("body", "") or ""
-    return None
+            candidates.append(e)
+    if not candidates:
+        return None
+    # Return the LATEST matching email; an early draft shouldn't outrank the
+    # final send when the agent iterates on a message in the same thread.
+    candidates.sort(key=lambda e: e.get("sim_time", 0))
+    return candidates[-1].get("body", "") or ""
+
+
+def _normalize_for_match(s: str) -> str:
+    """Lowercase and strip non-alphanumeric chars so "ISO-8601" matches "ISO8601"
+    and "date field" matches "datefield". British/US spelling differences must
+    still be enumerated explicitly in the locator's keywords list."""
+    return "".join(ch for ch in s.lower() if ch.isalnum())
 
 
 def _locate_decision_signal_body(world: dict[str, Any], loc: dict[str, Any]) -> str | None:
-    keywords = [kw.lower() for kw in loc.get("keywords_any", [])]
+    raw_keywords = loc.get("keywords_any", [])
+    keywords = [_normalize_for_match(kw) for kw in raw_keywords if kw]
     author = loc.get("author_id")
-    # Search messages, doc edits, doc comments.
+
+    def _hits(body: str) -> bool:
+        norm = _normalize_for_match(body)
+        return any(kw in norm for kw in keywords)
+
     chunks: list[str] = []
     for m in world.get("messages", []):
         if author and m.get("sender_id") != author:
             continue
-        body = (m.get("body") or "").lower()
-        if any(kw in body for kw in keywords):
+        if _hits(m.get("body") or ""):
             chunks.append(m.get("body") or "")
     for d in world.get("docs", []):
         for v in d.get("versions", []):
             if author and v.get("author_id") != author:
                 continue
-            body = (v.get("body") or "").lower()
-            if any(kw in body for kw in keywords):
+            if _hits(v.get("body") or ""):
                 chunks.append(v.get("body") or "")
         for c in d.get("comments", []):
             if author and c.get("author_id") != author:
                 continue
-            body = (c.get("body") or "").lower()
-            if any(kw in body for kw in keywords):
+            if _hits(c.get("body") or ""):
                 chunks.append(c.get("body") or "")
     for e in world.get("emails", []):
         if author and e.get("sender_id") != author:
             continue
-        body = (e.get("body") or "").lower()
-        if any(kw in body for kw in keywords):
+        if _hits(e.get("body") or ""):
             chunks.append(e.get("body") or "")
     return "\n\n---\n\n".join(chunks) if chunks else None

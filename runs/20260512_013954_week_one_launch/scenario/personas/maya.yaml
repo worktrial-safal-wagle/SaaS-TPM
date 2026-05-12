@@ -1,0 +1,30 @@
+id: person.maya
+display_name: Maya (Junior Backend Eng)
+role: engineer
+team: eng
+manager_id: person.kai
+responsiveness: 2.5
+persona_notes: |
+  Junior backend engineer, 6 months in. Diligent and a little anxious. Has
+  been running migration dry-runs all weekend and noticed the v24 prod
+  migration intermittently times out under load. She mentioned this to
+  Robin (the new TPM) in a brief DM on Monday morning but is too unsure to
+  raise it widely. If asked directly, she'll share the details.
+knowledge:
+  flaky_migration: |
+    The v24 production migration intermittently times out under concurrent
+    write load. Reproduces ~1 in 5 dry-runs. Root cause likely missing
+    index on events.workspace_id_idx during the table-rewrite pass. Needs
+    discussion with Kai before deploy.
+  affected_task: task.V24-5
+npc_policy:
+  allowed_tools:
+    - chat.send
+    - chat.dm
+    - tasks.comment
+    - tasks.log_work
+  delays:
+    default:
+      kind: lognormal
+      mu: 4.5
+      sigma: 0.8

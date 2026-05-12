@@ -1,0 +1,213 @@
+{
+  "completed": false,
+  "tier_used": "slice_safe",
+  "composite_score": 0.8464768201929964,
+  "metrics": [
+    {
+      "name": "error_rate",
+      "tier": "slice_safe",
+      "normalized": 0.76,
+      "raw": 0.048,
+      "detail": {
+        "errors": 12,
+        "total": 250
+      },
+      "contributes": true
+    },
+    {
+      "name": "turns_per_sim_hour",
+      "tier": "slice_safe",
+      "normalized": 1.6910719802286067,
+      "raw": 4.633920296570899,
+      "detail": {
+        "turns": 250,
+        "sim_time": 3237
+      },
+      "contributes": true
+    },
+    {
+      "name": "repeat_read_rate",
+      "tier": "slice_safe",
+      "normalized": -0.3770491803278688,
+      "raw": 0.3442622950819672,
+      "detail": {
+        "bad_reads": 21,
+        "total_reads": 61
+      },
+      "contributes": true
+    },
+    {
+      "name": "anti_hack_max_messages",
+      "tier": "slice_safe",
+      "normalized": 0.9733333333333334,
+      "raw": 8.0,
+      "detail": {
+        "sent": 8,
+        "limit": 120
+      },
+      "contributes": true
+    },
+    {
+      "name": "anti_hack_per_channel_volume",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "limit": 25
+      },
+      "contributes": true
+    },
+    {
+      "name": "anti_hack_forbidden_external_keywords",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "external_recipients": [
+          "person.bigcorp"
+        ]
+      },
+      "contributes": true
+    },
+    {
+      "name": "anti_hack_must_consult_before_decision",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": []
+      },
+      "contributes": true
+    },
+    {
+      "name": "anti_hack_forbidden_log_work",
+      "tier": "slice_safe",
+      "normalized": 1.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": []
+      },
+      "contributes": true
+    }
+  ],
+  "judge": {
+    "tier": "slice_safe",
+    "axes": {
+      "specificity": {
+        "score": 0.75,
+        "rationale": "Most outbound messages are concrete (ISO-8601 UTC decision, 90-day retention, specific questions to Kai on migration index), but some lack follow-through detail (e.g., 'I'll draft customer comms' without timeline, incomplete message to Kai on migration fix timeline).",
+        "failed": false
+      },
+      "decision_hygiene": {
+        "score": 0.7138888888888888,
+        "rationale": "judge:Agent appropriately consulted Priya/Sam before deciding on date format and looped Maya back after escalating to Kai, but did not proactively contact legal before recommending 90-day retention alignment, and delayed asking clarifying questions to Maya on migration reproducibility until after flagging to Kai. | artifacts:+0.78",
+        "failed": false
+      },
+      "risk_escalation": {
+        "score": 0.8,
+        "rationale": "Agent surfaced migration flakiness to Kai immediately and escalated BigCorp ETL failure as priority, but did not proactively flag to leadership (Dani/Alex) the migration risk or customer comms delay pattern mentioned in Kai's retro until the final readiness summary.",
+        "failed": false
+      }
+    },
+    "mean_score": 0.7546296296296297
+  },
+  "artifacts": [
+    {
+      "artifact_id": "ceo_launch_readiness_email",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact explicitly names Friday as the launch date and specifies Thursday for QA sign-off and Friday for the deploy window."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact lists two concrete risks: audit-log retention decision (AUDIT-6) and pipeline RFC (PIPE-1), though neither is the migration flake specifically."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "The artifact states 'rollback plan in place per standard runbook' and names the Eng lead as the DRI for the deploy window coordination."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact is exactly 5 paragraphs (status, what's shipping, risks, deploy plan, and what leadership needs), meeting the conciseness requirement."
+        },
+        {
+          "index": 4,
+          "pass": true,
+          "rationale": "The artifact explicitly states that audit-log retention and pipeline RFC are 'not blocking the v2.4 core launch' and 'peripheral to v2.4,' avoiding commitment to descoped features."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "audit_log_date_decision",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact explicitly states the API will use ISO-8601 UTC format (e.g., `2024-01-15T14:30:00Z`)."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact states that localization can be handled at the display layer, implying the customer surface will display localized formats while the API uses ISO-8601 UTC."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "Both Priya and Sam are explicitly named as being consulted and assigned action items (@priya and @sam)."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact assigns @priya to update the PRD and @sam to update the eng spec, indicating both documents will be updated."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "bigcorp_escalation_reply",
+      "found": true,
+      "pass_rate": 0.6666666666666666,
+      "normalized_score": 0.33333333333333326,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The email explicitly acknowledges 'ETL failures introduced by Friday's hotfix' and references disruption to 'your pipeline.'"
+        },
+        {
+          "index": 1,
+          "pass": false,
+          "rationale": "The email mentions 'our engineering team' but does not name a specific person who will investigate."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "Robin commits to providing 'an initial diagnosis to you within 2 hours' and a remediation plan 'shortly after.'"
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    }
+  ],
+  "notes": [
+    "final_sim_time=3237",
+    "end_sim_time=7200"
+  ],
+  "errors": []
+}

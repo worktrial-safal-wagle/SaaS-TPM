@@ -32,6 +32,7 @@ class ScenarioYaml(_Yaml):
     # Sim minutes until the scenario "ends" (used by the final evaluator's
     # tier gating).
     end_sim_time: int = 5 * 24 * 60  # 5 days
+    tick_size_minutes: int = Field(default=15, ge=1, le=240)  # Default cadence for tick-based actor polling. Per-scenario configurable; CLI overrides.
     description: str = ""
     default_working_hours: WorkingHours = Field(default_factory=WorkingHours)
 
@@ -192,8 +193,29 @@ class EvalHiddenFactYaml(_Yaml):
     source_locator: dict[str, Any]
 
 
+class EvalFollowUpTargetYaml(_Yaml):
+    """Declaration for follow_up_rate metric — see `sim/evaluator/metrics.py`."""
+    id: str
+    description: str
+    npc_id: str
+    target_minutes: int | None = None
+    follow_up_target_minutes: int | None = None  # alias accepted by metric
+    keywords_any: list[str] = Field(default_factory=list)
+
+
+class EvalAppropriateAbandonmentYaml(_Yaml):
+    """Declaration for appropriate_abandonments_rate metric — agent should
+    abandon the current action during this calendar event because an urgent
+    trigger fires within the event window."""
+    id: str
+    description: str
+    during_event: str  # calendar event id (e.g., "cal.standup.wed")
+
+
 class EvalYaml(_Yaml):
     objectives: list[EvalObjectiveYaml] = Field(default_factory=list)
     artifacts: list[EvalArtifactYaml] = Field(default_factory=list)
     anti_hack: list[EvalAntiHackYaml] = Field(default_factory=list)
     hidden_facts: list[EvalHiddenFactYaml] = Field(default_factory=list)
+    follow_up_targets: list[EvalFollowUpTargetYaml] = Field(default_factory=list)
+    appropriate_abandonments: list[EvalAppropriateAbandonmentYaml] = Field(default_factory=list)

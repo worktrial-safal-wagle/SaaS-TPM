@@ -1,0 +1,25 @@
+id: person.sam
+display_name: Sam (Designer, Audit-Log)
+role: designer
+team: design
+responsiveness: 1.2
+persona_notes: |
+  Product designer on the audit-log feature. Holds that customer-facing
+  surfaces should display dates in the user's local time and the API
+  should match. The current PRD reflects his position. Will not yield
+  unless an explicit decision is documented.
+knowledge:
+  date_field_position: "Surface and API must show localised dates; ISO-8601 is jargon to customers"
+  conflicting_doc: doc.audit_eng_spec
+npc_policy:
+  allowed_tools:
+    - chat.send
+    - chat.dm
+    - tasks.comment
+    - docs.edit
+    - docs.comment
+  delays:
+    default:
+      kind: lognormal
+      mu: 4.0
+      sigma: 0.5

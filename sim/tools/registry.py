@@ -26,6 +26,43 @@ from sim.store.entities import Notification
 from sim.tools.base import ToolCall, ToolOp, ToolResult, from_sdk_name
 
 
+# Fallback failure cost (minutes) — used only when we can't determine the
+# action's declared cost. Failed tool calls normally cost the action's
+# *declared* sim-time cost (`op.cost_for(args)`): a failed 10-min docs.create
+# should waste 10 sim-min, not 1, so a 10-call docs.create failure loop burns
+# 100 sim-min and the budget-pressure surfaces the bug. Cases where we fall
+# back to this constant:
+#   - unknown tool (no `op` to call `cost_for` on);
+#   - args failed pydantic validation (no typed `args` to pass to `cost_for`);
+#   - `cost_for(args)` itself raised (extremely rare; defensive only).
+# In all three the agent hasn't actually "attempted" a known costed action,
+# so charging the minimum is fair. We keep this > 0 so tight loops on broken
+# calls still cross `end_sim_time` and terminate.
+FAILURE_COST_MINUTES = 1
+
+
+def _format_validation_error(e: ValidationError) -> str:
+    """Format a Pydantic ValidationError into a self-recoverable message.
+
+    Pydantic's default `errors()[0]['msg']` drops the field name and error
+    type, leaving the agent with messages like `"Field required"` that don't
+    say *which* field. Real Sonnet runs got stuck looping the same incomplete
+    `docs.create` call 10+ times because the error didn't say "body".
+
+    Format: `invalid args: <field>: <msg> (type=<type>); <field2>: <msg2> ...`
+    Up to 5 errors are reported (more than that is almost certainly a wholly
+    malformed call where the first 5 are enough to diagnose).
+    """
+    parts = []
+    for err in e.errors()[:5]:
+        loc = ".".join(str(x) for x in err.get("loc") or []) or "<args>"
+        msg = err.get("msg", "")
+        etype = err.get("type", "")
+        parts.append(f"{loc}: {msg}" + (f" (type={etype})" if etype else ""))
+    suffix = f" [+{len(e.errors()) - 5} more]" if len(e.errors()) > 5 else ""
+    return "invalid args: " + "; ".join(parts) + suffix
+
+
 class ToolRegistry:
     def __init__(self, world: World, scheduler: Scheduler, caller_id: str) -> None:
         self.world = world
@@ -71,43 +108,72 @@ class ToolRegistry:
     # Dispatch
     # ------------------------------------------------------------------
 
+    def _failure(
+        self, call: ToolCall, error: str, *,
+        op: ToolOp | None = None, args: object | None = None,
+    ) -> ToolResult:
+        """Build a failed ToolResult and advance sim_time by the action's cost.
+
+        Policy: a failed call that *got far enough to know what it was trying
+        to do* costs its declared sim-time. Only fail-fast paths (unknown tool,
+        args failed validation, cost computation itself raised) fall back to
+        `FAILURE_COST_MINUTES`. This makes failure-loop bugs surface in
+        sim-time budgets — a 10-call docs.create failure loop burns 100
+        sim-min, not 10, so the budget pressure is visible in eval.
+
+        Charging real time on failure also keeps the scheduler-based design
+        safe against agents looping on a broken call: with cost > 0 the loop
+        eventually crosses end_sim_time and terminates.
+        """
+        if op is not None and args is not None:
+            try:
+                cost = op.cost_for(args)
+            except Exception:
+                # `cost_for` shouldn't raise when args is a parsed model,
+                # but if it does we fall back rather than mask the real
+                # failure with a second exception.
+                cost = FAILURE_COST_MINUTES
+        else:
+            cost = FAILURE_COST_MINUTES
+        self.scheduler.advance(cost)
+        return ToolResult(
+            ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
+            cost_minutes=cost, error=error,
+        )
+
     def dispatch(self, call: ToolCall) -> ToolResult:
         op = self._ops.get(call.tool) or self._ops.get(from_sdk_name(call.tool))
         if op is None:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=f"unknown tool: {call.tool}",
-            )
+            # Unknown tool — no `cost_for` available, fall back.
+            return self._failure(call, f"unknown tool: {call.tool}")
 
         try:
             args = op.args_model.model_validate(call.args)
         except ValidationError as e:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=f"invalid args: {e.errors()[0]['msg']}",
-            )
+            # Args didn't parse — we don't have a typed model to pass to
+            # `cost_for`, and the agent didn't make it past the parser, so
+            # charging the declared cost would be unfair. Fall back to
+            # FAILURE_COST_MINUTES.
+            return self._failure(call, _format_validation_error(e))
 
         try:
             declared_cost = op.cost_for(args)
         except Exception as e:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=f"cost computation failed: {e}",
-            )
+            # `cost_for` itself raised before we ever ran the handler;
+            # we don't have a usable declared cost. Fall back.
+            return self._failure(call, f"cost computation failed: {e}")
 
         start_sim_time = self.scheduler.sim_time
         try:
             result = op.handler(self.world, self.scheduler, args, self.caller_id)
         except ToolError as e:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=str(e),
-            )
+            # Args parsed cleanly, handler ran, business-logic rejection
+            # (ACL violation, duplicate id, etc.) — charge the declared cost.
+            return self._failure(call, str(e), op=op, args=args)
         except Exception as e:
-            return ToolResult(
-                ok=False, tool=call.tool, sim_time=self.scheduler.sim_time,
-                cost_minutes=0, error=f"handler error: {e}",
-            )
+            # Unexpected handler crash with valid args — still charge the
+            # declared cost; the agent did commit to the action.
+            return self._failure(call, f"handler error: {e}", op=op, args=args)
 
         # Most tools have a declared cost > 0 and don't touch the scheduler
         # themselves; we advance now. `wait.*` handlers advance the scheduler

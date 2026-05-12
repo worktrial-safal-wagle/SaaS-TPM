@@ -18,18 +18,56 @@ from pydantic import BaseModel, ConfigDict, Field
 from sim.tools.base import ToolCall
 
 
+class NpcTrigger(BaseModel):
+    """A single inbound event observed by an NPC since their last poll.
+
+    The runtime accumulates these between polls. On each poll, the NPC sees
+    every trigger that arrived in the interim — they prioritize internally
+    and act on at most one. Unaddressed triggers remain in the personal queue
+    for next tick (and may be dropped if the queue grows faster than the NPC
+    can drain it; that "dropped ball" is intentional, surfaces as eval signal).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    # `message_inserted` (DM or @-mention) or `email_inserted`, etc.
+    kind: str
+    payload: dict[str, Any] = Field(default_factory=dict)
+    # sim_time the trigger was created. Used for recency ordering.
+    sim_time: int = 0
+
+
 class NpcBrainContext(BaseModel):
-    """The shape of context handed to a brain on a reaction."""
+    """The shape of context handed to a brain on a poll (or meeting turn).
+
+    Tick-based polling supplies `triggers` — every inbound observed by the
+    NPC since their last poll. The brain decides ONE action (or none) based
+    on the queue. Meeting turns set `trigger_kind="meeting_turn"` and pass
+    the per-turn payload via `trigger_payload`; the `triggers` list is empty.
+    """
 
     model_config = ConfigDict(extra="forbid")
     npc_id: str
     persona_role: str
     persona_notes: str = ""
     knowledge: dict[str, str] = Field(default_factory=dict)
-    trigger_kind: str
+    # All inbound triggers accumulated since the NPC's last poll, ordered
+    # most-recent-first. The brain considers them as a queue and acts on
+    # (at most) one. Empty list means "no inbound triggered this poll" —
+    # the brain may still decide to do something proactive, or stay silent.
+    triggers: list[NpcTrigger] = Field(default_factory=list)
+    # Legacy single-trigger fields. Still used by meeting-turn invocations
+    # (where the runtime supplies a single per-turn payload). Tick-based
+    # polls leave these unset and use `triggers` instead.
+    trigger_kind: str = ""
     trigger_payload: dict[str, Any] = Field(default_factory=dict)
     # Compact view of relevant prior state — channel snippet, task snapshot, etc.
     context_excerpt: str = ""
+    # Tools the NPC is authorized to use. Each entry is
+    # {"name": "<dot.form>", "description": "...", "input_schema": <jsonschema>}.
+    # Passed in so the brain knows exact arg names — without this it
+    # hallucinates parameter names (e.g., to_user_id instead of recipient_id)
+    # and every NPC tool call gets rejected at dispatch time.
+    available_tools: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class NpcBrainOutput(BaseModel):

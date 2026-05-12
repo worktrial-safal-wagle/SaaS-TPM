@@ -191,3 +191,166 @@ def test_unknown_tool_returns_structured_error():
     result = registry.dispatch(ToolCall(tool="chat.delete", args={}))
     assert result.ok is False
     assert "unknown tool" in result.error
+
+
+# ---------------------------------------------------------------------------
+# DM resolution via recipient_id (Option B fix for canonical-direction errors)
+# ---------------------------------------------------------------------------
+
+
+def test_chat_read_by_recipient_id_resolves_dm_channel():
+    """Agent can call chat.read with recipient_id and skip channel_id entirely."""
+    world, scheduler, registry = _world_with_two_people()
+    # Send a DM first so the channel exists.
+    registry.dispatch(ToolCall(
+        tool="chat.dm", args={"recipient_id": "person.maya", "body": "hi maya"},
+    ))
+    # Read without constructing a channel_id.
+    result = registry.dispatch(ToolCall(
+        tool="chat.read", args={"recipient_id": "person.maya"},
+    ))
+    assert result.ok, result.error
+    assert len(result.result["messages"]) == 1
+    assert result.result["messages"][0]["body"] == "hi maya"
+    # The resolved channel_id is the canonical alphabetically-sorted form.
+    assert result.result["channel_id"] == "dm.person.maya__person.tpm"
+
+
+def test_chat_read_by_recipient_id_works_regardless_of_id_construction():
+    """The whole point: agent can't accidentally pass dm.tpm__maya (wrong direction)."""
+    world, scheduler, registry = _world_with_two_people()
+    registry.dispatch(ToolCall(
+        tool="chat.dm", args={"recipient_id": "person.maya", "body": "ping"},
+    ))
+    # Even though "tpm" sorts AFTER "maya", recipient_id resolution doesn't care.
+    result = registry.dispatch(ToolCall(
+        tool="chat.read", args={"recipient_id": "person.maya"},
+    ))
+    assert result.ok
+
+
+def test_chat_read_rejects_both_channel_and_recipient():
+    world, scheduler, registry = _world_with_two_people()
+    result = registry.dispatch(ToolCall(
+        tool="chat.read",
+        args={"channel_id": "channel.eng", "recipient_id": "person.maya"},
+    ))
+    assert not result.ok
+    assert "exactly one" in result.error
+
+
+def test_chat_read_rejects_neither_channel_nor_recipient():
+    world, scheduler, registry = _world_with_two_people()
+    result = registry.dispatch(ToolCall(tool="chat.read", args={}))
+    assert not result.ok
+    assert "exactly one" in result.error
+
+
+def test_chat_read_by_recipient_id_unknown_person():
+    world, scheduler, registry = _world_with_two_people()
+    result = registry.dispatch(ToolCall(
+        tool="chat.read", args={"recipient_id": "person.ghost"},
+    ))
+    assert not result.ok
+    assert "person" in result.error.lower()
+
+
+def test_chat_mark_read_by_recipient_id():
+    world, scheduler, registry = _world_with_two_people()
+    registry.dispatch(ToolCall(
+        tool="chat.dm", args={"recipient_id": "person.maya", "body": "hi"},
+    ))
+    result = registry.dispatch(ToolCall(
+        tool="chat.mark_read", args={"recipient_id": "person.maya"},
+    ))
+    assert result.ok
+    assert result.result["channel_id"] == "dm.person.maya__person.tpm"
+
+
+def test_chat_read_with_channel_id_still_works():
+    """Regression: existing channel_id usage isn't broken."""
+    world, scheduler, registry = _world_with_two_people()
+    registry.dispatch(ToolCall(
+        tool="chat.send", args={"channel_id": "channel.eng", "body": "in eng"},
+    ))
+    result = registry.dispatch(ToolCall(
+        tool="chat.read", args={"channel_id": "channel.eng"},
+    ))
+    assert result.ok
+    assert len(result.result["messages"]) == 1
+
+
+# ---------------------------------------------------------------------------
+# Presence surfacing on chat.list (Phase 5)
+# ---------------------------------------------------------------------------
+
+
+def _dm_channel(world: World, a: str, b: str) -> str:
+    """Helper: create a DM channel and return its canonical id."""
+    from sim.tools.chat import _dm_channel_id
+    cid = _dm_channel_id(a, b)
+    if cid not in world.channels:
+        world.add_channel(Channel(
+            id=cid, name=f"DM: {a} <-> {b}",
+            members=sorted([a, b]), is_private=True, is_dm=True,
+        ))
+    return cid
+
+
+def test_chat_list_includes_presence_for_dm_peer_available():
+    """For a DM channel, chat.list reports presence for the *other* member.
+    With no busy_until set, in_meeting is False."""
+    world, scheduler, registry = _world_with_two_people()
+    _dm_channel(world, "person.tpm", "person.maya")
+    result = registry.dispatch(ToolCall(tool="chat.list", args={}))
+    assert result.ok
+    dms = [c for c in result.result["channels"] if c["is_dm"]]
+    assert len(dms) == 1
+    presence = dms[0].get("presence")
+    assert presence is not None, "DM channel should carry a presence block"
+    assert presence == {
+        "in_meeting": False,
+        "available_at": None,
+        "current_event_title": None,
+    }
+
+
+def test_chat_list_presence_reports_in_meeting_when_busy():
+    """If the DM peer's busy_until > now, presence reports in_meeting=True
+    and available_at is the unblock sim_time."""
+    world, scheduler, registry = _world_with_two_people()
+    _dm_channel(world, "person.tpm", "person.maya")
+    world.people["person.maya"].busy_until = 60
+    result = registry.dispatch(ToolCall(tool="chat.list", args={}))
+    assert result.ok
+    dms = [c for c in result.result["channels"] if c["is_dm"]]
+    assert dms[0]["presence"]["in_meeting"] is True
+    assert dms[0]["presence"]["available_at"] == 60
+
+
+def test_chat_list_presence_reports_current_event_title():
+    """If a calendar event covers `now` for the DM peer, the event title is
+    included in the presence projection."""
+    from sim.store import CalendarEvent
+    world, scheduler, registry = _world_with_two_people()
+    _dm_channel(world, "person.tpm", "person.maya")
+    world.add_calendar_event(CalendarEvent(
+        id="cal.launch_review", title="Launch review",
+        start_sim_time=0, end_sim_time=60,
+        organizer_id="person.tpm", attendees=["person.maya"],
+    ))
+    world.people["person.maya"].busy_until = 60
+    result = registry.dispatch(ToolCall(tool="chat.list", args={}))
+    assert result.ok
+    dms = [c for c in result.result["channels"] if c["is_dm"]]
+    assert dms[0]["presence"]["current_event_title"] == "Launch review"
+
+
+def test_chat_list_non_dm_channels_have_no_presence():
+    """Presence is only meaningful for DM channels (one peer). Public/team
+    channels don't get a presence block."""
+    world, scheduler, registry = _world_with_two_people()
+    result = registry.dispatch(ToolCall(tool="chat.list", args={}))
+    assert result.ok
+    eng = [c for c in result.result["channels"] if c["id"] == "channel.eng"][0]
+    assert "presence" not in eng

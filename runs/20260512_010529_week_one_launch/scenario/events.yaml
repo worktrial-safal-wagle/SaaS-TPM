@@ -1,0 +1,86 @@
+events:
+  # Hidden Maya DM about the flaky migration — buried in DMs on Mon late morning.
+  - kind: npc_send_dm
+    fire_at: 120              # Mon 11:00
+    actor: person.maya
+    params:
+      recipient_id: person.tpm
+      body: |
+        Hey Robin — quick heads-up. The v2.4 migration's been flaky in my
+        dry-runs this weekend (~1 in 5 timeouts under load). It's the
+        events table — probably missing index on workspace_id during the
+        rewrite. I mentioned it in #engineering but it didn't really land.
+        Worth a chat with Kai before deploy?
+
+  # Tuesday morning: customer escalation email arrives.
+  - kind: npc_send_email
+    fire_at: 1500             # Tue 10:00
+    actor: person.bigcorp
+    params:
+      to: [person.tpm]
+      cc: [person.jordan, person.morgan]
+      subject: "URGENT — pipeline failures since Friday's hotfix"
+      body: |
+        Hi — Casey from BigCorp. Since your hotfix Friday our ETL is
+        consistently failing on the events endpoint. Three of our reports
+        are stale. Our QBR is next Tuesday. Please advise within the hour.
+
+        — Casey
+
+  # Wednesday morning: CEO asks for launch-readiness summary.
+  - kind: npc_send_email
+    fire_at: 2910             # Wed 09:30
+    actor: person.alex
+    params:
+      to: [person.tpm]
+      cc: [person.dani]
+      subject: "Launch-readiness summary — by EOD please"
+      body: |
+        Robin — please send me a concise written summary of v2.4 launch
+        readiness by EOD today: status, risks, what could slip and why,
+        deploy plan, rollback plan. Three paragraphs is fine.
+        — Alex
+
+  # Thursday early afternoon: the design/eng disagreement surfaces in chat.
+  - kind: npc_send_chat
+    fire_at: 4380             # Thu 13:00
+    actor: person.priya
+    params:
+      channel_id: channel.audit-log
+      body: |
+        Re-flagging the date-field thing — I cannot start frontend
+        integration tests until we have a decision. ISO-8601 UTC on the
+        API is non-negotiable from my side because partners are integrating.
+      mentions: [person.tpm, person.sam]
+  - kind: npc_send_chat
+    fire_at: 4395             # Thu 13:15
+    actor: person.sam
+    params:
+      channel_id: channel.audit-log
+      body: |
+        And I cannot in good conscience ship a customer surface that shows
+        UTC timestamps to non-engineers. We need a PM call here.
+      mentions: [person.tpm]
+
+  # Thursday late morning: support flags the bigcorp escalation hasn't been
+  # answered if the agent dragged feet on Tuesday.
+  - kind: npc_send_chat
+    fire_at: 4200             # Thu 10:00
+    actor: person.jordan
+    params:
+      channel_id: channel.launch-v24
+      body: |
+        FYI — bigcorp pipeline issue still outstanding from Tue. They've
+        followed up twice. Just making sure it's on the radar.
+      mentions: [person.tpm]
+
+  # Friday morning: Dani asks for the weekly written status.
+  - kind: npc_send_email
+    fire_at: 5760             # Fri 09:00
+    actor: person.dani
+    params:
+      to: [person.tpm]
+      subject: "Weekly written status to leadership"
+      body: |
+        Robin — keep it to one page. Status, biggest risks, next-week
+        plan. Send by Fri EOD.

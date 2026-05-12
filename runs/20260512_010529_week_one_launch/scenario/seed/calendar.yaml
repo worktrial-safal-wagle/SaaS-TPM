@@ -1,0 +1,72 @@
+# Calendar entries are in sim_time minutes (0 = Mon 09:00).
+events:
+  - id: cal.standup.mon
+    title: "Eng standup"
+    start_sim_time: 30        # Mon 09:30
+    end_sim_time: 60
+    organizer_id: person.dani
+    attendees: [person.tpm, person.dani, person.kai, person.maya, person.priya]
+    location: "#engineering (async)"
+    agenda: "Daily standup — async ok, but block 09:30 for sync questions."
+  - id: cal.standup.tue
+    title: "Eng standup"
+    start_sim_time: 1470      # Tue 09:30
+    end_sim_time: 1500
+    organizer_id: person.dani
+    attendees: [person.tpm, person.dani, person.kai, person.maya, person.priya]
+    location: "#engineering"
+    agenda: "Daily standup."
+  - id: cal.standup.wed
+    title: "Eng standup"
+    start_sim_time: 2910      # Wed 09:30
+    end_sim_time: 2940
+    organizer_id: person.dani
+    attendees: [person.tpm, person.dani, person.kai, person.maya, person.priya]
+    location: "#engineering"
+    agenda: "Daily standup."
+  - id: cal.standup.thu
+    title: "Eng standup"
+    start_sim_time: 4350      # Thu 09:30
+    end_sim_time: 4380
+    organizer_id: person.dani
+    attendees: [person.tpm, person.dani, person.kai, person.maya, person.priya]
+    location: "#engineering"
+    agenda: "Daily standup."
+  - id: cal.standup.fri
+    title: "Eng standup"
+    start_sim_time: 5790      # Fri 09:30
+    end_sim_time: 5820
+    organizer_id: person.dani
+    attendees: [person.tpm, person.dani, person.kai, person.maya, person.priya]
+    location: "#engineering"
+    agenda: "Daily standup."
+  - id: cal.launch_review
+    title: "v2.4 Launch Readiness Review"
+    start_sim_time: 3060      # Wed 14:00
+    end_sim_time: 3120
+    organizer_id: person.dani
+    attendees: [person.tpm, person.dani, person.kai, person.morgan, person.jordan, person.maya]
+    location: "Conf Room 1 / Zoom"
+    agenda: |
+      1. Is v2.4 green for Friday deploy? (Kai)
+      2. Customer comms status. (Morgan)
+      3. Rollback plan walkthrough. (Jordan + Kai)
+      4. Open risks (Robin to flag).
+  - id: cal.audit_spec_review
+    title: "Audit-log spec review"
+    start_sim_time: 4500      # Thu 14:00
+    end_sim_time: 4560
+    organizer_id: person.priya
+    attendees: [person.tpm, person.priya, person.sam, person.dani, person.morgan]
+    location: "Conf Room 1"
+    agenda: |
+      Reconcile the date-field format question between PRD and eng spec.
+      Robin to drive a decision.
+  - id: cal.daily_1on1
+    title: "Robin <> Dani 1:1"
+    start_sim_time: 450       # Mon 16:30
+    end_sim_time: 480
+    organizer_id: person.dani
+    attendees: [person.tpm, person.dani]
+    location: "Dani's office"
+    agenda: "Daily 1:1 — flag what you need."

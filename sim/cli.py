@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import datetime as dt
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -48,14 +49,33 @@ def _add_run(sub):
     p.add_argument("--agent", default="scripted_noop",
                    help="Which agent to run: 'scripted_noop' or 'anthropic'")
     p.add_argument("--model", default=None, help="Override model name for anthropic agent")
+    p.add_argument("--tick-size", type=int, default=None,
+                   help="Override the scenario's tick_size_minutes (1..240). "
+                        "Omit to use the per-scenario default.")
     p.add_argument("--log-dir", type=Path, default=Path("runs"),
                    help="Output directory for run artifacts. Use '-' to disable.")
     p.set_defaults(func=_cmd_run)
 
 
 def _cmd_run(args):
-    scenario = load_scenario(args.scenario)
-    rt = build_runtime(scenario)
+    scenario = load_scenario(args.scenario, tick_size_minutes=args.tick_size)
+    # NPC brain: default to Sonnet 4.6 when ANTHROPIC_API_KEY is set so NPCs
+    # actually behave like the characters the persona files describe.
+    # Without it, every NPC trigger fires the default stub brain (effectively
+    # silent), which makes the eval grade one-sided agent outbound rather
+    # than real stakeholder management.
+    npc_brain = None
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        from sim.npc.anthropic_brain import AnthropicNPCBrain
+        npc_brain = AnthropicNPCBrain()
+    else:
+        print(
+            "WARNING: ANTHROPIC_API_KEY not set; NPCs will use the stub brain "
+            "(mostly silent). The eval will only see agent outbound, not "
+            "stakeholder reactions.",
+            file=sys.stderr,
+        )
+    rt = build_runtime(scenario, brain=npc_brain)
     assembler = BriefingAssembler(rt.world, end_sim_time=scenario.config.end_sim_time)
 
     # Set up the logger before driver wires its observer
@@ -79,13 +99,34 @@ def _cmd_run(args):
         rt.world, rt.scheduler, rt.agent_registry, agent, assembler,
         DriverConfig(max_turns=args.max_turns, end_sim_time=scenario.config.end_sim_time),
         turn_observer=(logger.log_turn if logger else None),
+        tick_size_minutes=scenario.config.tick_size_minutes,
+        agent_id=scenario.config.agent_id,
     )
     turns = driver.run()
     if logger:
-        logger.finalize(rt.world, scenario.config, args.scenario)
+        logger.finalize(rt.world, scenario.config, args.scenario,
+                        final_sim_time=rt.scheduler.sim_time)
         print(f"Completed {len(turns)} turns; final sim_time={rt.scheduler.sim_time}; run dir: {logger.run_dir}")
     else:
         print(f"Completed {len(turns)} turns; final sim_time={rt.scheduler.sim_time}")
+    # Surface NPC brain health so silent failures (rate limits, parse errors)
+    # don't look like NPCs simply chose not to react. This is operator-facing
+    # diagnostic only — it never feeds back into the agent or eval.
+    if rt.npc_runtime.brain_failures or rt.npc_runtime.brain_successes:
+        total = rt.npc_runtime.brain_failures + rt.npc_runtime.brain_successes
+        rate = rt.npc_runtime.brain_failures / total
+        print(
+            f"NPC brain: {rt.npc_runtime.brain_successes} ok, "
+            f"{rt.npc_runtime.brain_failures} failed ({rate:.0%})",
+            file=sys.stderr,
+        )
+        if rate > 0.2:
+            print(
+                "WARNING: >20% of NPC brain calls failed — NPCs were largely "
+                "silent. Inspect transient API errors (rate limits) and "
+                "consider a smaller --max-turns or higher tier API key.",
+                file=sys.stderr,
+            )
     return 0
 
 
@@ -113,8 +154,22 @@ def _add_grade(sub):
 
 def _cmd_grade(args):
     from sim.evaluator.final import grade_and_write
-    result = grade_and_write(args.run_dir)
+    from sim.evaluator.judge import AnthropicJudge
+    if os.environ.get("ANTHROPIC_API_KEY"):
+        judge = AnthropicJudge()
+    else:
+        print(
+            "WARNING: ANTHROPIC_API_KEY not set; the LLM judge will not run. "
+            "All judge axes and per-artifact rubrics will score 0.0 from a stub.",
+            file=sys.stderr,
+        )
+        judge = None
+    result = grade_and_write(args.run_dir, judge=judge)
     print(f"composite_score: {result.composite_score:+.3f} (tier={result.tier_used})")
+    if result.errors:
+        print(f"  {len(result.errors)} judge issue(s):", file=sys.stderr)
+        for e in result.errors:
+            print(f"    - {e}", file=sys.stderr)
     return 0
 
 

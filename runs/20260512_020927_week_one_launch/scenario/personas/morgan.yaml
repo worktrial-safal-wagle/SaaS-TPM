@@ -1,0 +1,19 @@
+id: person.morgan
+display_name: Morgan (Sales Lead)
+role: sales_lead
+team: sales
+responsiveness: 0.9
+persona_notes: |
+  Sales lead. Cares about whether v2.4 ships on time because three deals
+  are gated on the new audit-log feature. Will push back if the audit-log
+  scope slips.
+npc_policy:
+  allowed_tools:
+    - chat.send
+    - chat.dm
+    - email.send
+  delays:
+    default:
+      kind: lognormal
+      mu: 3.6
+      sigma: 0.5

@@ -1,0 +1,10 @@
+tasks:
+  - id: task.SMOKE-1
+    project: SMOKE
+    title: "Confirm tool surface works"
+    description: "Move this task through the workflow as a wiring sanity check."
+    status: Backlog
+    assignee_id: person.tpm
+    reporter_id: person.tpm
+    priority: P2
+    estimated_effort_seconds: 600

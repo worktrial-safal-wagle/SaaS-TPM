@@ -113,3 +113,151 @@ def test_docs_comment_appends_and_records_author():
     assert len(doc.comments) == 1
     assert doc.comments[0].author_id == "person.tpm"
     assert doc.comments[0].body == "needs clarification"
+
+
+def test_docs_create_missing_body_error_names_field():
+    """A docs.create with missing `body` must surface the field name in the error.
+
+    Real Sonnet runs got stuck looping the same incomplete call 10+ times because
+    the error was just `"Field required"` with no field name. Recovering from a
+    tool-arg error requires knowing which arg was wrong.
+    """
+    world, scheduler, tpm_reg, _ = _setup()
+    result = tpm_reg.dispatch(ToolCall(
+        tool="docs.create",
+        args={"doc_id": "doc.spec", "title": "Spec"},  # body missing
+    ))
+    assert not result.ok
+    assert "body" in result.error
+    assert "Field required" in result.error
+    assert "type=missing" in result.error
+
+
+def test_docs_create_multi_field_error_reports_all():
+    world, scheduler, tpm_reg, _ = _setup()
+    result = tpm_reg.dispatch(ToolCall(
+        tool="docs.create",
+        args={},  # missing doc_id, title, body
+    ))
+    assert not result.ok
+    assert "doc_id" in result.error
+    assert "title" in result.error
+    assert "body" in result.error
+
+
+# ---------------------------------------------------------------------------
+# Failure-cost policy: handler-level (ToolError) failures cost the *declared*
+# sim-time, not the 1-min fallback. This makes failure-loop bugs surface in
+# the sim-time budget rather than getting silently amortized to nothing.
+# ---------------------------------------------------------------------------
+
+
+def test_docs_create_duplicate_id_costs_declared_amount_on_failure():
+    """A docs.create that fails because `doc_id` is already taken still costs
+    the full declared docs.create cost (~15+ min). A 10-call failure loop on
+    docs.create burns 150+ sim-min — that's the point of charging declared
+    cost on failure (vs the old 1-min flat fee that hid the bug)."""
+    from sim.tools.costs import cost_doc_create
+
+    world, scheduler, tpm_reg, _ = _setup()
+    # Seed an existing doc so the second create collides.
+    first = tpm_reg.dispatch(ToolCall(
+        tool="docs.create",
+        args={"doc_id": "doc.spec", "title": "Spec", "body": "v1 body here"},
+    ))
+    assert first.ok
+    start = scheduler.sim_time
+
+    # Use a body for which the declared cost is well above the 1-min fallback,
+    # so we can distinguish the new behaviour from the old.
+    body = "x" * 600  # 15 + ceil(600/100) = 21 min
+    expected_cost = cost_doc_create(type("A", (), {"body": body})())
+    assert expected_cost == 21  # sanity-check the formula
+
+    result = tpm_reg.dispatch(ToolCall(
+        tool="docs.create",
+        args={"doc_id": "doc.spec", "title": "Dup", "body": body},
+    ))
+    assert result.ok is False
+    assert "already exists" in result.error
+    # Declared cost, NOT the 1-min fallback.
+    assert result.cost_minutes == expected_cost
+    assert scheduler.sim_time == start + expected_cost
+
+
+def test_docs_create_acl_failure_costs_declared_amount():
+    """A docs.edit blocked by acl_edit still costs the action's declared
+    sim-time on failure (Sonnet's docs.create failure loop equivalent)."""
+    from sim.tools.costs import cost_doc_edit
+
+    world, scheduler, tpm_reg, alice_reg = _setup()
+    tpm_reg.dispatch(ToolCall(
+        tool="docs.create",
+        args={"doc_id": "doc.x", "title": "x", "body": "v1",
+              "acl_view": ["person.tpm", "person.alice"],
+              "acl_edit": ["person.tpm"]},  # alice can view, not edit
+    ))
+    start = scheduler.sim_time
+
+    new_body = "y" * 500  # 5 + ceil(500/100) = 10 min
+    expected_cost = cost_doc_edit(type("A", (), {"body": new_body})())
+    assert expected_cost == 10
+
+    edit = alice_reg.dispatch(ToolCall(
+        tool="docs.edit",
+        args={"doc_id": "doc.x", "body": new_body},
+    ))
+    assert edit.ok is False
+    assert "not authorized" in edit.error
+    assert edit.cost_minutes == expected_cost
+    assert scheduler.sim_time == start + expected_cost
+
+
+def test_docs_create_validation_error_costs_fallback_one_minute():
+    """A docs.create that fails pydantic validation (missing required field)
+    falls back to FAILURE_COST_MINUTES because there's no parsed `args` to
+    pass to `cost_for`. The agent's "attempt" was so malformed they didn't
+    even know what they were attempting; charging the full declared cost
+    would be unfair."""
+    from sim.tools.registry import FAILURE_COST_MINUTES
+
+    world, scheduler, tpm_reg, _ = _setup()
+    start = scheduler.sim_time
+    result = tpm_reg.dispatch(ToolCall(
+        tool="docs.create",
+        args={"doc_id": "doc.spec", "title": "Spec"},  # body missing
+    ))
+    assert result.ok is False
+    assert "body" in result.error  # the existing field-name behaviour
+    assert result.cost_minutes == FAILURE_COST_MINUTES
+    assert FAILURE_COST_MINUTES == 1
+    assert scheduler.sim_time == start + FAILURE_COST_MINUTES
+
+
+def test_docs_create_failure_loop_burns_full_declared_cost():
+    """The flagship regression case: a 10-call docs.create failure loop that
+    used to burn 10 sim-min now burns ~210 sim-min, so it shows up in eval
+    as the budget problem it is."""
+    from sim.tools.costs import cost_doc_create
+
+    world, scheduler, tpm_reg, _ = _setup()
+    # Seed the conflict so every subsequent create fails on duplicate.
+    body = "x" * 600
+    tpm_reg.dispatch(ToolCall(
+        tool="docs.create",
+        args={"doc_id": "doc.spec", "title": "Spec", "body": body},
+    ))
+    per_call = cost_doc_create(type("A", (), {"body": body})())  # 21 min
+    after_first = scheduler.sim_time
+
+    failures = 0
+    for _ in range(10):
+        r = tpm_reg.dispatch(ToolCall(
+            tool="docs.create",
+            args={"doc_id": "doc.spec", "title": "Spec", "body": body},
+        ))
+        assert r.ok is False
+        failures += 1
+    # Each failure costs `per_call` minutes, not 1.
+    assert scheduler.sim_time == after_first + 10 * per_call
+    assert failures == 10

@@ -1,0 +1,264 @@
+# 25 tasks across three projects: V24 (launch), AUDIT (audit-log feature),
+# PIPE (pipeline refactor). Effort is in seconds. Dependencies model the
+# real critical path. The agent isn't expected to know all of these on day
+# one; discovery is part of the eval.
+tasks:
+  # === V2.4 LAUNCH ===
+  - id: task.V24-1
+    project: V24
+    title: "Run final smoke tests on v2.4 RC"
+    description: "Full test suite + integration smoke against staging."
+    status: "In Progress"
+    assignee_id: person.kai
+    reporter_id: person.dani
+    priority: P0
+    estimated_effort_seconds: 14400
+    remaining_effort_seconds: 7200
+    deadline_sim_time: 720       # Mon EOD-ish
+  - id: task.V24-2
+    project: V24
+    title: "Cut v2.4 release branch"
+    description: "Tag release/v2.4 from main once smoke is green."
+    status: Backlog
+    assignee_id: person.kai
+    reporter_id: person.dani
+    priority: P0
+    estimated_effort_seconds: 1800
+    deadline_sim_time: 720
+    depends_on: [task.V24-1]
+  - id: task.V24-3
+    project: V24
+    title: "Update v2.4 changelog"
+    description: "Customer-facing release notes."
+    status: Backlog
+    assignee_id: person.kai
+    reporter_id: person.tpm
+    priority: P1
+    estimated_effort_seconds: 3600
+    deadline_sim_time: 4320
+  - id: task.V24-4
+    project: V24
+    title: "Notify customers of v2.4 deploy window"
+    description: "Email all affected customers with the deploy window and rollback policy."
+    status: Backlog
+    assignee_id: person.morgan
+    reporter_id: person.tpm
+    priority: P1
+    estimated_effort_seconds: 5400
+    deadline_sim_time: 4320
+    depends_on: [task.V24-2]
+  - id: task.V24-5
+    project: V24
+    title: "Validate v2.4 migration under load"
+    description: "Re-run the migration dry-run with a synthetic concurrent write workload."
+    status: "In Progress"
+    assignee_id: person.maya
+    reporter_id: person.kai
+    priority: P0
+    estimated_effort_seconds: 10800
+    remaining_effort_seconds: 7200
+    deadline_sim_time: 2880      # Tue EOD
+  - id: task.V24-6
+    project: V24
+    title: "Deploy v2.4 to production"
+    description: "Final deploy. Coordinated with support."
+    status: Backlog
+    assignee_id: person.kai
+    reporter_id: person.dani
+    priority: P0
+    estimated_effort_seconds: 7200
+    deadline_sim_time: 5760      # Fri AM
+    depends_on: [task.V24-1, task.V24-2, task.V24-5]
+  - id: task.V24-7
+    project: V24
+    title: "Stage rollback plan v3"
+    description: "Stage the rollback artefacts and verify the runbook is up to date."
+    status: Backlog
+    assignee_id: person.kai
+    reporter_id: person.jordan
+    priority: P1
+    estimated_effort_seconds: 5400
+    deadline_sim_time: 4320
+  - id: task.V24-8
+    project: V24
+    title: "Customer-facing comms approved by sales"
+    description: "Get Morgan's sign-off on the release-notes blurb."
+    status: Backlog
+    assignee_id: person.morgan
+    reporter_id: person.tpm
+    priority: P2
+    estimated_effort_seconds: 1800
+    deadline_sim_time: 4320
+    depends_on: [task.V24-3]
+  - id: task.V24-9
+    project: V24
+    title: "Wednesday launch readiness review"
+    description: "Run the launch-readiness review meeting; capture decisions."
+    status: Backlog
+    assignee_id: person.tpm
+    reporter_id: person.dani
+    priority: P1
+    estimated_effort_seconds: 3600
+    deadline_sim_time: 3600      # Wed 17:00ish
+  - id: task.V24-10
+    project: V24
+    title: "Send launch-readiness summary to CEO"
+    description: "Concise written summary of status, risks, and the deploy plan."
+    status: Backlog
+    assignee_id: person.tpm
+    reporter_id: person.alex
+    priority: P0
+    estimated_effort_seconds: 2400
+    deadline_sim_time: 3540      # Wed EOD
+
+  # === AUDIT-LOG FEATURE ===
+  - id: task.AUDIT-1
+    project: AUDIT
+    title: "Audit-log PRD signoff"
+    description: "Get PRD sign-off from design + eng."
+    status: "In Review"
+    assignee_id: person.priya
+    reporter_id: person.tpm
+    priority: P1
+    estimated_effort_seconds: 1800
+    deadline_sim_time: 5760
+  - id: task.AUDIT-2
+    project: AUDIT
+    title: "Resolve date-field format disagreement"
+    description: "Pick one format (ISO-8601 UTC vs localised) and document in both PRD and eng spec."
+    status: Blocked
+    assignee_id: person.tpm
+    reporter_id: person.dani
+    priority: P0
+    estimated_effort_seconds: 3600
+    deadline_sim_time: 5040      # Thu EOD
+  - id: task.AUDIT-3
+    project: AUDIT
+    title: "Backend scaffolding"
+    description: "Initial endpoints and DB schema for audit-log."
+    status: Done
+    assignee_id: person.priya
+    reporter_id: person.dani
+    priority: P1
+  - id: task.AUDIT-4
+    project: AUDIT
+    title: "Frontend rendering"
+    description: "Build the customer-facing audit-log viewer."
+    status: Blocked
+    assignee_id: person.sam
+    reporter_id: person.priya
+    priority: P2
+    estimated_effort_seconds: 21600
+    deadline_sim_time: 8640
+    depends_on: [task.AUDIT-2]
+  - id: task.AUDIT-5
+    project: AUDIT
+    title: "API contract for partners"
+    description: "Public API contract doc for partner integration."
+    status: Backlog
+    assignee_id: person.priya
+    reporter_id: person.morgan
+    priority: P1
+    estimated_effort_seconds: 7200
+    deadline_sim_time: 4320
+    depends_on: [task.AUDIT-2]
+  - id: task.AUDIT-6
+    project: AUDIT
+    title: "Reconcile audit-log retention with legal"
+    description: "Eng spec says 365 days, legal wants 90. Pick one, update docs."
+    status: Backlog
+    assignee_id: person.tpm
+    reporter_id: person.dani
+    priority: P1
+    estimated_effort_seconds: 1800
+    deadline_sim_time: 7200
+  - id: task.AUDIT-7
+    project: AUDIT
+    title: "QA pass on audit-log"
+    description: "Full QA after frontend lands."
+    status: Backlog
+    assignee_id: person.maya
+    reporter_id: person.priya
+    priority: P2
+    estimated_effort_seconds: 14400
+    deadline_sim_time: 10080
+    depends_on: [task.AUDIT-4]
+
+  # === PIPELINE REFACTOR ===
+  - id: task.PIPE-1
+    project: PIPE
+    title: "Pipeline refactor RFC decision"
+    description: "Decide Q2 or Q3 for the pipeline refactor. RFC is up."
+    status: Todo
+    assignee_id: person.tpm
+    reporter_id: person.dani
+    priority: P1
+    estimated_effort_seconds: 3600
+    deadline_sim_time: 7200
+  - id: task.PIPE-2
+    project: PIPE
+    title: "Pipeline schema draft"
+    description: "Draft the proposed schema for the new pipeline."
+    status: Backlog
+    assignee_id: person.kai
+    reporter_id: person.dani
+    priority: P2
+    estimated_effort_seconds: 14400
+    depends_on: [task.PIPE-1]
+  - id: task.PIPE-3
+    project: PIPE
+    title: "Pipeline migration plan"
+    description: "End-to-end migration plan with rollback."
+    status: Backlog
+    assignee_id: person.kai
+    reporter_id: person.dani
+    priority: P2
+    estimated_effort_seconds: 10800
+    depends_on: [task.PIPE-2]
+
+  # === MISC ===
+  - id: task.OPS-1
+    project: OPS
+    title: "Set up Robin's recurring 1:1s"
+    description: "Calendar invites with all directs and key cross-functional partners."
+    status: Backlog
+    assignee_id: person.tpm
+    reporter_id: person.dani
+    priority: P3
+    estimated_effort_seconds: 1800
+  - id: task.OPS-2
+    project: OPS
+    title: "Triage incoming customer escalations"
+    description: "Standing task — handle the inbox."
+    status: "In Progress"
+    assignee_id: person.tpm
+    reporter_id: person.jordan
+    priority: P1
+  - id: task.OPS-3
+    project: OPS
+    title: "Weekly written status to leadership"
+    description: "Friday EOD recap."
+    status: Backlog
+    assignee_id: person.tpm
+    reporter_id: person.dani
+    priority: P2
+    deadline_sim_time: 6480
+  - id: task.OPS-4
+    project: OPS
+    title: "Document on-call rotation for v2.4 launch"
+    description: "Who's primary, secondary, comms lead — for Fri/Sat/Sun."
+    status: Backlog
+    assignee_id: person.jordan
+    reporter_id: person.tpm
+    priority: P1
+    estimated_effort_seconds: 1800
+    deadline_sim_time: 4320
+  - id: task.OPS-5
+    project: OPS
+    title: "Confirm audit-log capability commitment with sales"
+    description: "Confirm the three Q2 deals' scope expectations with Morgan."
+    status: Backlog
+    assignee_id: person.tpm
+    reporter_id: person.morgan
+    priority: P1
+    estimated_effort_seconds: 1800

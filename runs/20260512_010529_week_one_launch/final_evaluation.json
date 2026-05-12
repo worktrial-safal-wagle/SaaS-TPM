@@ -1,0 +1,193 @@
+{
+  "completed": false,
+  "tier_used": "slice_safe",
+  "composite_score": 0.20144649257552483,
+  "metrics": [
+    {
+      "name": "error_rate",
+      "tier": "slice_safe",
+      "normalized": -1.0,
+      "raw": 0.596,
+      "detail": {
+        "errors": 149,
+        "total": 250
+      },
+      "contributes": true
+    },
+    {
+      "name": "turns_per_sim_hour",
+      "tier": "slice_safe",
+      "normalized": 0.8888888888888888,
+      "raw": 16.666666666666668,
+      "detail": {
+        "turns": 250,
+        "sim_time": 900
+      },
+      "contributes": true
+    },
+    {
+      "name": "repeat_read_rate",
+      "tier": "slice_safe",
+      "normalized": 0.6129032258064516,
+      "raw": 0.0967741935483871,
+      "detail": {
+        "bad_reads": 3,
+        "total_reads": 31
+      },
+      "contributes": true
+    },
+    {
+      "name": "tight_loop_rate",
+      "tier": "slice_safe",
+      "normalized": -1.0,
+      "raw": 0.556,
+      "detail": {
+        "loop_turns": 139,
+        "total_turns": 250,
+        "threshold": 3,
+        "longest_loop": {
+          "tool": "meetings.attend",
+          "args_sig": "{\"event_id\": \"cal.audit2.decision\"}",
+          "length": 133
+        }
+      },
+      "contributes": true
+    },
+    {
+      "name": "anti_hack_max_messages",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 14.0,
+      "detail": {
+        "sent": 14,
+        "limit": 120,
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_per_channel_volume",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "limit": 25,
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_forbidden_external_keywords",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "external_recipients": [
+          "person.bigcorp"
+        ],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_must_consult_before_decision",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_forbidden_log_work",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "violated": false
+      },
+      "contributes": false
+    }
+  ],
+  "judge": {
+    "tier": "slice_safe",
+    "axes": {
+      "specificity": {
+        "score": 0.82,
+        "rationale": "Agent's outbound messages are concrete and actionable: specific task IDs (V24-11, AUDIT-5), exact technical details (CREATE INDEX CONCURRENTLY events_workspace_id_idx, ISO-8601 UTC), clear owners, and defined timelines (staging by EOD, branch cut tomorrow); minor vagueness on rollback window decision.",
+        "failed": false
+      },
+      "decision_hygiene": {
+        "score": 0.20833333333333334,
+        "rationale": "judge:Agent correctly escalated the date-format conflict to a three-way meeting with Sam and Priya rather than forcing a decision unilaterally; however, initially pushed ISO-8601 decision at Sam (sim 17) before recognizing the need for proper stakeholder alignment, showing some lag in hygiene. | artifacts:-0.33",
+        "failed": false
+      },
+      "risk_escalation": {
+        "score": 0.88,
+        "rationale": "Agent proactively surfaced the migration timeout risk (1-in-5 failure rate) to leadership via standup and direct follow-up with Kai; flagged audit-log retention mismatch (365 vs 90 days) implicitly through task tracking; escalated customer comms ownership gap to Morgan; only minor gap: did not explicitly surface the pipeline RFC decision deadline to leadership in writing.",
+        "failed": false
+      }
+    },
+    "mean_score": 0.6361111111111111
+  },
+  "artifacts": [
+    {
+      "artifact_id": "ceo_launch_readiness_email",
+      "found": false,
+      "pass_rate": 0.0,
+      "normalized_score": -1.0,
+      "items": [],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "audit_log_date_decision",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact explicitly states the API will use ISO-8601 UTC format (e.g., '2024-01-15T14:32:00Z')."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact clearly states dates will be rendered in the user's locale in the UI/frontend layer."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "Both Priya and Sam are named multiple times as consulted parties in the decision-making process and meeting."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact includes updated versions of doc.audit_prd with the decision documented in a 'Decision Log' section clarifying the API format and frontend concern."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "bigcorp_escalation_reply",
+      "found": false,
+      "pass_rate": 0.0,
+      "normalized_score": -1.0,
+      "items": [],
+      "failed": false,
+      "failure_reason": ""
+    }
+  ],
+  "notes": [
+    "final_sim_time=900",
+    "end_sim_time=7200"
+  ],
+  "errors": []
+}

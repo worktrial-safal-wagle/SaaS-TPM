@@ -1,0 +1,1 @@
+{"turn": 0, "sim_time_before": 0, "sim_time_after": 480, "tool": "wait.until", "args": {"target_sim_time": 480}, "ok": true, "cost_minutes": 480, "error": null, "notifications_count": 0, "result": {"waited_minutes": 480, "sim_time": 480}}

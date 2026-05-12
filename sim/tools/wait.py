@@ -1,8 +1,9 @@
 """`wait.*` operations — explicit sim-time advancement.
 
-Two flavors:
-  - `wait.until(target)` — advance to a specific sim_time.
-  - `wait.for_next_event()` — advance to the next *agent-visible* scheduled event.
+Only `wait.until` survives the tick-driven rewrite. The previous
+wait-for-next-event tool was replaced by `idle.until` (see
+`sim/tools/idle.py`); the agent no longer needs to scan the global event
+heap because the driver polls them every tick.
 
 The cost of a wait is the elapsed sim time. Wait is the only tool whose cost
 is literally the cost.
@@ -17,7 +18,6 @@ from pydantic import BaseModel
 from sim.scheduler import Scheduler
 from sim.store import World
 from sim.tools.base import ToolOp
-from sim.tools.costs import AGENT_VISIBLE_EVENT_KINDS
 from sim.tools.registry import ToolError
 
 
@@ -54,28 +54,6 @@ def wait_until(world: World, scheduler: Scheduler, args: WaitUntilArgs, caller_i
 
 
 # ---------------------------------------------------------------------------
-# wait.for_next_event
-# ---------------------------------------------------------------------------
-
-
-class WaitForNextEventArgs(BaseModel):
-    pass
-
-
-def wait_for_next_event(world: World, scheduler: Scheduler, args: WaitForNextEventArgs, caller_id: str) -> dict[str, Any]:
-    target = scheduler.next_matching_fire_at(AGENT_VISIBLE_EVENT_KINDS)
-    if target is None:
-        raise ToolError("no agent-visible event is scheduled; cannot wait")
-    if target <= scheduler.sim_time:
-        # An event is already due — drain it without advancing.
-        scheduler.advance(0)
-        return {"waited_minutes": 0, "sim_time": scheduler.sim_time}
-    delta = target - scheduler.sim_time
-    scheduler.advance(delta)
-    return {"waited_minutes": delta, "sim_time": scheduler.sim_time}
-
-
-# ---------------------------------------------------------------------------
 # Op bundle
 # ---------------------------------------------------------------------------
 
@@ -87,6 +65,4 @@ def wait_ops() -> list[ToolOp]:
         # ToolResult still reflects the new sim_time correctly.
         ToolOp("wait.until", WaitUntilArgs, 0, wait_until,
                description="Advance sim_time to a specific target. Use to skip dead time."),
-        ToolOp("wait.for_next_event", WaitForNextEventArgs, 0, wait_for_next_event,
-               description="Advance sim_time to the next agent-visible event (incoming DM, email, calendar start, heartbeat). Sharper than wait.until — no need to guess the time."),
     ]

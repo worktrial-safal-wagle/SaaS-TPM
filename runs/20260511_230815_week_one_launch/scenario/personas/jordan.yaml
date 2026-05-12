@@ -1,0 +1,23 @@
+id: person.jordan
+display_name: Jordan (Support Lead)
+role: support_lead
+team: support
+responsiveness: 0.7
+persona_notes: |
+  Customer Support lead. Will flag customer escalations early and expects
+  a 2-hour SLA on PM response when she escalates one. Sends a short note
+  to chat when something heats up.
+knowledge:
+  sla_pm_response: "2 hours"
+npc_policy:
+  allowed_tools:
+    - chat.send
+    - chat.dm
+    - email.send
+    - tasks.create
+    - tasks.comment
+  delays:
+    default:
+      kind: lognormal
+      mu: 3.5
+      sigma: 0.4

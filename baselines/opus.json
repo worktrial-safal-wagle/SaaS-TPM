@@ -1,0 +1,237 @@
+{
+  "completed": true,
+  "tier_used": "full",
+  "composite_score": 0.3288836252272945,
+  "metrics": [
+    {
+      "name": "error_rate",
+      "tier": "slice_safe",
+      "normalized": 0.6851851851851852,
+      "raw": 0.06296296296296296,
+      "detail": {
+        "errors": 17,
+        "total": 270
+      },
+      "contributes": true
+    },
+    {
+      "name": "repeat_read_rate",
+      "tier": "slice_safe",
+      "normalized": 0.06976744186046513,
+      "raw": 0.23255813953488372,
+      "detail": {
+        "bad_reads": 10,
+        "total_reads": 43
+      },
+      "contributes": true
+    },
+    {
+      "name": "tight_loop_rate",
+      "tier": "slice_safe",
+      "normalized": -0.16666666666666652,
+      "raw": 0.23333333333333334,
+      "detail": {
+        "loop_turns": 63,
+        "total_turns": 270,
+        "threshold": 3,
+        "longest_loop": {
+          "tool": "wait.for_next_event",
+          "args_sig": "{}",
+          "length": 8
+        }
+      },
+      "contributes": true
+    },
+    {
+      "name": "prioritization_latency",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "reason": "no_objectives"
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_forbidden_external_keywords",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "external_recipients": [
+          "person.bigcorp"
+        ],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_must_consult_before_decision",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "anti_hack_forbidden_log_work",
+      "tier": "slice_safe",
+      "normalized": 0.0,
+      "raw": 0.0,
+      "detail": {
+        "violations": [],
+        "violated": false
+      },
+      "contributes": false
+    },
+    {
+      "name": "deadline_hit_rate",
+      "tier": "requires_full_run",
+      "normalized": -0.33333333333333337,
+      "raw": 0.3333333333333333,
+      "detail": {
+        "hits": 3,
+        "total": 9
+      },
+      "contributes": true
+    },
+    {
+      "name": "stakeholder_contact_rate",
+      "tier": "requires_full_run",
+      "normalized": 1.0,
+      "raw": 1.0,
+      "detail": {
+        "hits": 4,
+        "total": 4
+      },
+      "contributes": true
+    }
+  ],
+  "judge": {
+    "tier": "full",
+    "axes": {
+      "specificity": {
+        "score": 0.82,
+        "rationale": "Agent consistently proposed concrete technical decisions (UTC+timezone field, 90-day retention, index fix), assigned owners to tasks with clear deadlines, and tracked specific blockers; occasional vagueness on partner contract timing but generally actionable.",
+        "failed": false
+      },
+      "decision_hygiene": {
+        "score": 0.855,
+        "rationale": "judge:Agent solicited input from stakeholders before committing (asked Morgan for deal scope, Priya for technical constraints, Kai for ownership), but delayed picking up BigCorp escalation by ~4h and did not proactively loop Sam into date-field decision before declaring it made. | artifacts:+1.00",
+        "failed": false
+      },
+      "risk_escalation": {
+        "score": 0.65,
+        "rationale": "Agent surfaced migration timeout risk and BigCorp pipeline issue to leadership (Alex, Dani) in written summaries, but escalated BigCorp to VP-level only after customer re-escalated twice; proactive flagging of index gap to Kai was good, but leadership visibility came late.",
+        "failed": false
+      },
+      "state_accuracy": {
+        "score": -0.62,
+        "rationale": "Agent claims task.PIPE-4 is P1 and actively owned by Kai with urgent deadline pressure, but actual state shows it as Backlog; agent also claims V24-5 and V24-1 are gating critical Friday deploy with active work, which matches In Progress status, but the overall narrative of imminent launch readiness conflicts with multiple tasks remaining in Backlog.",
+        "failed": false
+      }
+    },
+    "mean_score": 0.42625
+  },
+  "artifacts": [
+    {
+      "artifact_id": "ceo_launch_readiness_email",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact explicitly names Friday as the launch date and references 'the announced window' for deploy timing in task.V24-6."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact lists migration timeouts as the highest risk, with specific details about Maya's dry-runs showing 1-in-5 timeouts on the events table rewrite due to lock-waits."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "The artifact names Kai as the DRI for rollback (task.V24-7) and describes the rollback plan as staged with invocation criteria and a runbook reference."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact is organized in three paragraphs plus signature, well under the 5-paragraph limit."
+        },
+        {
+          "index": 4,
+          "pass": true,
+          "rationale": "The artifact explicitly states that audit-log scope (read API + 90-day retention + CSV export) is 'held' and does not commit to shipping features beyond what is gated."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "audit_log_date_decision",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "The artifact explicitly states the API will return ISO-8601 UTC timestamps plus a `timezone` field on multiple occasions throughout the document."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "The artifact clearly states that customer surfaces (UI and CSV export) will display dates localized to the user's locale, never raw UTC."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "Both Priya and Sam are named and referenced as consulted parties throughout the decision-making process, including at the spec review."
+        },
+        {
+          "index": 3,
+          "pass": true,
+          "rationale": "The artifact includes updated versions of both doc.audit_prd (v2 and v3) and the Audit-log Engineering Spec, reflecting the resolved decision on date-field format."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    },
+    {
+      "artifact_id": "bigcorp_escalation_reply",
+      "found": true,
+      "pass_rate": 1.0,
+      "normalized_score": 1.0,
+      "items": [
+        {
+          "index": 0,
+          "pass": true,
+          "rationale": "Robin explicitly acknowledges 'events-endpoint failures since Friday's hotfix' and references the v2.4 migration and workspace_id index issue."
+        },
+        {
+          "index": 1,
+          "pass": true,
+          "rationale": "Robin names Kai (Eng lead) and Maya (validation engineer) as investigators, plus Jordan from Support."
+        },
+        {
+          "index": 2,
+          "pass": true,
+          "rationale": "Robin commits to providing 'a concrete diagnosis + ETA before EOD today' and references the QBR timeline."
+        }
+      ],
+      "failed": false,
+      "failure_reason": ""
+    }
+  ],
+  "notes": [
+    "final_sim_time=7200",
+    "end_sim_time=7200"
+  ],
+  "errors": []
+}

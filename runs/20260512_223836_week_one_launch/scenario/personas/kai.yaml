@@ -1,0 +1,28 @@
+id: person.kai
+display_name: Kai (Senior Backend Eng)
+role: engineer
+team: eng
+manager_id: person.dani
+responsiveness: 0.8
+persona_notes: |
+  Senior backend engineer, owns the v2.4 launch. Terse. Will only escalate
+  blockers when he's sure. Will trust Maya's signal if a TPM raises it but
+  won't go hunting for it on his own.
+knowledge:
+  v24_owner: "I'm the engineer of record for v2.4"
+npc_policy:
+  allowed_tools:
+    - chat.send
+    - chat.dm
+    - email.send
+    - tasks.update_status
+    - tasks.assign
+    - tasks.comment
+    - tasks.log_work
+    - docs.edit
+    - docs.comment
+  delays:
+    default:
+      kind: lognormal
+      mu: 4.0
+      sigma: 0.6

@@ -1,0 +1,25 @@
+{
+  "turn_count": 50,
+  "error_count": 7,
+  "verdict_count": 0,
+  "tool_counts": {
+    "docs.list": 2,
+    "meetings.attend": 2,
+    "calendar.list": 1,
+    "chat.read": 9,
+    "tasks.list": 1,
+    "chat.send": 2,
+    "email.read": 7,
+    "email.send": 2,
+    "docs.read": 5,
+    "chat.dm": 3,
+    "email.list": 1,
+    "tasks.get": 3,
+    "tasks.comment": 4,
+    "docs.edit": 1,
+    "tasks.update_status": 3,
+    "notifications.list": 2,
+    "tasks.log_work": 2
+  },
+  "final_sim_time": 185
+}

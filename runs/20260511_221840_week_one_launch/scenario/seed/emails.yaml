@@ -1,0 +1,159 @@
+threads:
+  - id: thread.welcome
+    subject: "Welcome to Lumen — first-week priorities"
+    participants: [person.tpm, person.dani]
+  - id: thread.onboarding
+    subject: "TPM onboarding — pinned resources"
+    participants: [person.tpm, person.dani, person.maya]
+  - id: thread.q2_roadmap
+    subject: "Q2 roadmap snapshot"
+    participants: [person.tpm, person.dani, person.alex, person.morgan]
+  - id: thread.support_runbook
+    subject: "Support runbook v3 for v2.4"
+    participants: [person.tpm, person.jordan, person.kai]
+  - id: thread.audit_kickoff
+    subject: "Audit-log feature kickoff notes"
+    participants: [person.tpm, person.priya, person.sam, person.dani]
+  - id: thread.legal_review
+    subject: "Legal review — audit-log retention"
+    participants: [person.tpm, person.dani, person.priya]
+  - id: thread.last_quarter_retro
+    subject: "Q1 retro notes (FYI for new TPM)"
+    participants: [person.tpm, person.dani, person.kai]
+  - id: thread.partner_inquiry
+    subject: "Partner inquiry: audit-log API contract"
+    participants: [person.tpm, person.morgan]
+  - id: thread.customer_qbr
+    subject: "Customer QBR — BigCorp"
+    participants: [person.tpm, person.morgan, person.jordan]
+  - id: thread.pipeline_proposal
+    subject: "Data pipeline refactor — RFC"
+    participants: [person.tpm, person.kai, person.dani]
+  - id: thread.calendar_setup
+    subject: "Robin's recurring 1:1s and standups"
+    participants: [person.tpm, person.dani]
+  - id: thread.security_advisory
+    subject: "Internal: dependency advisory (low risk)"
+    participants: [person.tpm, person.kai, person.dani]
+
+emails:
+  - id: email.welcome.1
+    thread_id: thread.welcome
+    sender_id: person.dani
+    to: [person.tpm]
+    sim_time: 0
+    body: |
+      Welcome aboard. v2.4 ships Friday. Your priorities this week:
+        1. Land the v2.4 launch with no surprises.
+        2. Get the audit-log work onto a credible track.
+        3. Make sure the pipeline refactor RFC has a decision by EOW.
+      We have a 1:1 on the calendar daily at 16:30. Use it to flag anything.
+  - id: email.onboarding.1
+    thread_id: thread.onboarding
+    sender_id: person.maya
+    to: [person.tpm]
+    cc: [person.dani]
+    sim_time: 1
+    body: |
+      Hi Robin — putting these on your radar:
+        - v2.4 launch board: /tasks?project=V24
+        - Audit-log PRD: doc.audit_prd
+        - Pipeline RFC: doc.pipeline_rfc
+        - Runbook: doc.runbook_v24
+      I'll be in #engineering most days. Happy to walk you through anything.
+  - id: email.q2.1
+    thread_id: thread.q2_roadmap
+    sender_id: person.alex
+    to: [person.tpm, person.dani]
+    cc: [person.morgan]
+    sim_time: 2
+    body: |
+      Robin — for awareness. Q2 has v2.4 (this week), the audit-log feature
+      following on, and pipeline refactor running in parallel. I'll be in
+      and out this week. If you need me, email — I read everything.
+  - id: email.support.1
+    thread_id: thread.support_runbook
+    sender_id: person.jordan
+    to: [person.tpm, person.kai]
+    sim_time: 3
+    body: |
+      Hi — runbook v3 is locked. Two open questions:
+        1. Who's on point for the post-deploy customer comms?
+        2. Are we offering a rollback window? (Currently the runbook says
+           4 hours but Kai mentioned 2.)
+      Would love a TPM steer on (1).
+  - id: email.audit.1
+    thread_id: thread.audit_kickoff
+    sender_id: person.priya
+    to: [person.tpm]
+    cc: [person.dani, person.sam]
+    sim_time: 4
+    body: |
+      Hi Robin — audit-log feature kickoff notes attached (see doc.audit_prd
+      and doc.audit_eng_spec). One open issue: Sam and I disagree on the
+      date-field format for the customer-facing API. Surfacing now so we
+      can land a decision early.
+  - id: email.legal.1
+    thread_id: thread.legal_review
+    sender_id: person.dani
+    to: [person.tpm, person.priya]
+    sim_time: 5
+    body: |
+      Legal wants confirmation that audit-log retention is 90 days max.
+      Eng spec currently says 365. Please reconcile before the spec is
+      handed to legal next Monday.
+  - id: email.retro.1
+    thread_id: thread.last_quarter_retro
+    sender_id: person.kai
+    to: [person.tpm, person.dani]
+    sim_time: 6
+    body: |
+      Last quarter's retro takeaways for context:
+        - Migrations are always our biggest deploy risk.
+        - Customer comms have been late three releases in a row.
+        - We commit to dates without consulting Eng too often.
+  - id: email.partner.1
+    thread_id: thread.partner_inquiry
+    sender_id: person.morgan
+    to: [person.tpm]
+    sim_time: 7
+    body: |
+      One of our partners is asking for the audit-log API contract early so
+      they can start their integration. Can you give me a date by Wed?
+  - id: email.qbr.1
+    thread_id: thread.customer_qbr
+    sender_id: person.morgan
+    to: [person.tpm, person.jordan]
+    sim_time: 8
+    body: |
+      QBR with BigCorp next month. They've been twitchy about uptime this
+      quarter. Just FYI as you read into the account.
+  - id: email.pipeline.1
+    thread_id: thread.pipeline_proposal
+    sender_id: person.kai
+    to: [person.tpm, person.dani]
+    sim_time: 9
+    body: |
+      Pipeline refactor RFC is up. Decision needed by EOW on whether to
+      proceed in Q2 or push to Q3. My recommendation: push to Q3 —
+      audit-log is going to chew through eng cycles.
+  - id: email.cal.1
+    thread_id: thread.calendar_setup
+    sender_id: person.dani
+    to: [person.tpm]
+    sim_time: 10
+    body: |
+      Calendar set up:
+        - Daily 1:1 with me at 16:30
+        - Eng standup at 09:30 (#engineering)
+        - Launch readiness review Wed 14:00
+        - Audit-log spec review Thu 14:00
+        - All-hands Fri 16:00
+  - id: email.security.1
+    thread_id: thread.security_advisory
+    sender_id: person.kai
+    to: [person.tpm, person.dani]
+    sim_time: 11
+    body: |
+      Low-risk advisory on the lib we use for token signing. Patch landed
+      already, just FYI — no action required.

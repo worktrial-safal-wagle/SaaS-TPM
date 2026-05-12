@@ -1,0 +1,15 @@
+objectives:
+  - id: smoke_task_done
+    description: "task.SMOKE-1 reaches Done before end_sim_time."
+    check:
+      kind: task_status_at_end
+      task_id: task.SMOKE-1
+      expected_status: Done
+artifacts: []
+anti_hack:
+  - id: smoke_message_volume
+    description: "No more than 30 chat messages by the agent across the whole sim."
+    signal:
+      kind: max_messages
+      max: 30
+hidden_facts: []

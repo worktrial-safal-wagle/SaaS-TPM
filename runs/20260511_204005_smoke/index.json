@@ -1,0 +1,15 @@
+{
+  "turn_count": 12,
+  "error_count": 0,
+  "verdict_count": 0,
+  "tool_counts": {
+    "tasks.get": 1,
+    "tasks.update_status": 2,
+    "tasks.log_work": 1,
+    "chat.list": 1,
+    "chat.send": 1,
+    "wait.for_next_event": 5,
+    "wait.until": 1
+  },
+  "final_sim_time": 480
+}

@@ -1,0 +1,18 @@
+id: person.bigcorp
+display_name: Casey @ BigCorp (Customer)
+role: customer_contact
+team: external
+responsiveness: 0.5
+persona_notes: |
+  External customer at BigCorp Analytics. Escalates an outage on Tuesday
+  morning over email. Expects a PM acknowledgement within 2 hours and a
+  status update within the day. NOT a directory member the agent typically
+  reaches out to; treat as an external participant.
+npc_policy:
+  allowed_tools:
+    - email.send
+  delays:
+    default:
+      kind: lognormal
+      mu: 5.5
+      sigma: 0.5

@@ -55,6 +55,10 @@ class Person(_Entity):
     persona_notes: str = ""
     # Knowledge state the loader can seed (used by NPC brain context).
     knowledge: dict[str, str] = Field(default_factory=dict)
+    # Tick scheduling: when this actor should next be polled
+    next_poll_at: int = 0
+    # Tick scheduling: actor unavailable until this sim_time
+    busy_until: int = 0
 
 
 # ---------------------------------------------------------------------------
